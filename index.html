@@ -252,6 +252,16 @@ table.lb tr.me td{background:var(--yellow); color:var(--ink)}
 .kv b{color:var(--ink)}
 kbd{font-family:var(--mono); font-size:11px; border:1px solid var(--ink); padding:1px 6px; background:var(--paper)}
 
+.codein{
+  font-family:var(--mono); font-size:30px; font-weight:700; letter-spacing:.24em;
+  text-transform:uppercase; text-align:center; width:100%; padding:10px;
+  border:2px solid var(--ink); background:var(--paper); color:var(--ink);
+}
+.codeout{
+  font-size:clamp(34px,5vw,54px); font-weight:800; letter-spacing:.22em;
+  background:var(--yellow); border:2px solid var(--ink); padding:4px 18px;
+  display:inline-block; font-family:var(--mono);
+}
 .toast{
   position:fixed; left:50%; bottom:18px; transform:translateX(-50%);
   background:var(--ink); color:var(--paper); font-family:var(--mono); font-size:12px;
@@ -313,6 +323,9 @@ kbd{font-family:var(--mono); font-size:11px; border:1px solid var(--ink); paddin
         <div class="title-acts">
           <button class="btn primary big" id="btnPlay">Play</button>
           <button class="btn big" id="btnSetup">Camera setup</button>
+        </div>
+        <div class="title-acts" style="margin-top:10px">
+          <button class="btn big" data-go="online">Play a friend</button>
         </div>
         <div class="title-acts" style="margin-top:8px">
           <button class="btn quiet" data-go="select">Fighters</button>
@@ -486,6 +499,46 @@ kbd{font-family:var(--mono); font-size:11px; border:1px solid var(--ink); paddin
       </div>
     </section>
 
+    <!-- ===================== ONLINE PAIRING ===================== -->
+    <section class="screen" id="s-online">
+      <div class="pad">
+        <h2 class="h-lg">Play a friend</h2>
+        <p class="muted" style="max-width:64ch; margin:0">
+          Both of you open this page. One creates a room and reads out the code, the other joins with it.
+          Your two browsers connect <b>directly to each other</b> — the match never touches a server.
+          Each of you uses your own camera.
+        </p>
+        <div class="two">
+          <div class="card">
+            <h3>Create a room</h3>
+            <button class="btn primary" id="btnHost">Create room</button>
+            <div id="hostBox" style="display:none; gap:8px">
+              <p class="lbl" style="margin:0">Give your friend this code</p>
+              <div class="codeout" id="roomCode">····</div>
+              <p class="note" id="hostStatus">Waiting for the other player…</p>
+            </div>
+          </div>
+          <div class="card">
+            <h3>Join a room</h3>
+            <input class="codein" id="joinCode" maxlength="4" placeholder="CODE"
+                   autocomplete="off" spellcheck="false">
+            <button class="btn" id="btnJoin">Join room</button>
+            <p class="note" id="joinStatus">Type the 4-character code.</p>
+          </div>
+        </div>
+        <div class="card">
+          <h3>Connection</h3>
+          <div class="kv"><span>Status</span><b id="netStatus">Not connected</b></div>
+          <div class="kv"><span>Opponent</span><b id="netPeer">—</b></div>
+          <div class="kv"><span>Ping</span><b id="netPing">—</b></div>
+          <p class="note">One round, first knockout wins. Damage still needs range, speed and a good hit zone — and your friend sees your real body move if your camera is on.</p>
+          <button class="btn primary big" id="btnNetFight" disabled>Start the fight</button>
+          <button class="btn quiet" id="btnNetLeave">Disconnect</button>
+        </div>
+        <button class="btn quiet" data-go="title" style="justify-self:start">Back</button>
+      </div>
+    </section>
+
     <!-- ===================== SHOP ===================== -->
     <section class="screen" id="s-shop">
       <div class="pad">
@@ -562,7 +615,11 @@ const SAVE_KEY = "motionbrawler.save.v1";
 const DEFAULT_SAVE = {
   lv:1, xp:0, coins:500, wins:0, losses:0, streak:0, rp:1000,
   bestCombo:0, fastest:0, fighter:"RIVET", diff:1,
-  owned:["RIVET","KESTREL","PANEL"]
+  owned:["RIVET","KESTREL","PANEL"],
+  /* everything below is device-local too, so a reload picks up exactly
+     where you left off — including your body calibration */
+  mirror:true, sensitivity:.62, cal:null, name:"you",
+  matches:0, totalDmg:0, onlineWins:0
 };
 function xpForLevel(lv){ return 300 + (lv-1)*250; }
 let P = loadSave();
@@ -577,6 +634,10 @@ function save(){
   try{ localStorage.setItem(SAVE_KEY, JSON.stringify(P)); }catch(e){}
   paintTopbar();
 }
+/* never lose a session to a closed tab or a crash */
+addEventListener("visibilitychange", () => { if(document.hidden) save(); });
+addEventListener("pagehide", save);
+setInterval(save, 10000);
 function grant(xp, coins, rp){
   P.xp += xp; P.coins += coins; P.rp = Math.max(0, P.rp + rp);
   let leveled = 0;
@@ -727,10 +788,15 @@ function calibrate(){
     armLen: Math.max(.08, dist(s[L.SHL], s[L.ELL]) + dist(s[L.ELL], s[L.WRL])),
     hipY: hp.y, noseY: s[L.NOSE].y, centerX: sh.x, torso: Math.max(.08, dist(sh, hp))
   };
-  $("#cShoulder").textContent = Pose.cal.shoulderW.toFixed(3);
-  $("#cArm").textContent = Pose.cal.armLen.toFixed(3);
-  $("#cHip").textContent = Pose.cal.hipY.toFixed(3);
-  toast("Calibrated to your body.");
+  P.cal = Pose.cal; save();                 /* calibration survives a reload */
+  paintCal();
+  toast("Calibrated to your body — saved on this device.");
+}
+function paintCal(){
+  const c = Pose.cal;
+  $("#cShoulder").textContent = c ? c.shoulderW.toFixed(3) : "—";
+  $("#cArm").textContent = c ? c.armLen.toFixed(3) : "—";
+  $("#cHip").textContent = c ? c.hipY.toFixed(3) : "—";
 }
 
 /* --- recognizer: landmarks -> discrete actions --- */
@@ -879,19 +945,21 @@ function makeFighter(f, x, facing, isBot){
   return {
     f, x, facing, isBot,
     hp, maxHp: hp, st:100, sp:0,
-    reach: .15 + statOf(f,"AGILITY") * .0009,
+    reach: .19 + statOf(f,"AGILITY") * .0010,
     speed: .30 + statOf(f,"SPEED") * .0040,
     power: statOf(f,"POWER"), defense: statOf(f,"DEFENSE"),
     anim:"GUARD", animT:0, stun:0, atkT:0, atkSide:"R",
-    aiT:.8, aiMode:"approach"
+    aiT:.8, aiMode:"approach",
+    vx:0, prevX:x, walk:0, ko:false, koT:0, win:false
   };
 }
-function startMatch(){
+function startMatch(online){
   const me = byId(P.fighter);
   const pool = FIGHTERS.filter(f => f.id !== me.id);
-  const foe = pool[Math.floor(Math.random() * pool.length)];
+  const foe = online ? byId(Net.remoteFighter) : pool[Math.floor(Math.random() * pool.length)];
   PL = makeFighter(me, .32, 1, false);
-  OP = makeFighter(foe, .68, -1, true);
+  OP = makeFighter(foe, .68, -1, !online);
+  Match.online = !!online;
   Match.on = true; Match.paused = false; Match.round = 1; Match.wins = [0,0];
   Match.timer = 60; Match.state = "countdown"; Match.stateT = 3;
   Match.combo = 0; Match.best = 0; Match.fastest = 0; Match.hits = 0; Match.whiffs = 0;
@@ -899,7 +967,7 @@ function startMatch(){
   dmgFx.length = 0; hitFx.length = 0;
   $("#pName").textContent = me.id;
   $("#oName").textContent = foe.id;
-  $("#oTag").textContent = ["dummy","easy bot","medium bot","hard bot"][P.diff] || "bot";
+  $("#oTag").textContent = online ? "online" : (["dummy","easy bot","medium bot","hard bot"][P.diff] || "bot");
   $("#pauseBox").classList.remove("on");
   paintRounds();
   logHit("Step in close, then punch fast", "");
@@ -909,6 +977,7 @@ function newRound(){
   PL.hp = PL.maxHp; OP.hp = OP.maxHp;
   PL.st = 100; OP.st = 100; PL.x = .32; OP.x = .68;
   PL.stun = 0; OP.stun = 0;
+  [PL,OP].forEach(f => { f.ko = false; f.koT = 0; f.win = false; f.prevX = f.x; f.vx = 0; });
   Match.timer = 60; Match.state = "countdown"; Match.stateT = 3; Match.combo = 0;
 }
 function paintRounds(){
@@ -960,6 +1029,9 @@ function tryAttack(attacker, defender, ev){
   attacker.sp = Math.min(100, attacker.sp + dmg * .7);
   defender.sp = Math.min(100, defender.sp + dmg * .4);
 
+  /* online: the attacker computes the hit, the defender applies it */
+  if(Match.online && attacker === PL) netSend({ t:"h", d:dmg, z:ev.zone, s:ev.speed });
+
   const crit = ev.zone === "HEAD" && speedF > 1.2;
   dmgFx.push({ x:defender.x, y:.42, v:dmg, life:.9, crit, zone:ev.zone,
                jx:(Math.random()-.5)*.06, jy:Math.random()*.55 });
@@ -975,12 +1047,17 @@ function tryAttack(attacker, defender, ev){
   }else{
     Match.combo = 0;
   }
-  if(defender.hp <= 0) endRound(attacker === PL);
+  if(defender.hp <= 0){
+    if(Match.online){ if(attacker === PL) endOnline(true); }
+    else endRound(attacker === PL);
+  }
 }
 
 function endRound(playerWon){
   Match.state = "ko"; Match.stateT = 2.2;
   Match.wins[playerWon ? 0 : 1]++;
+  (playerWon ? OP : PL).ko = true;
+  (playerWon ? PL : OP).win = true;
   paintRounds();
   callout(playerWon ? "K.O." : "DOWN", 2);
 }
@@ -1053,18 +1130,23 @@ function botMove(gap, dt, skill){
   const away = b.x > p.x ? 1 : -1;
   let dir = 0;
   if(b.aiMode === "retreat") dir = away;
-  else if(gap < b.reach * .75) dir = away;               /* never crowd inside its own reach */
+  else if(gap < b.reach * .55) dir = away;               /* back off only when truly crowded */
   else if(b.aiMode === "approach" || b.aiMode === "attack") dir = -away;
   b.x = clamp(b.x + dir * b.speed * dt * (0.5 + skill * .6), ARENA.left, ARENA.right);
 }
 
 /* fighters are solid: keep them apart and keep the player on the left */
-const MIN_GAP = .11;
+const MIN_GAP = .145;
 function separate(){
   if(OP.x - PL.x < MIN_GAP){
-    const push = (MIN_GAP - (OP.x - PL.x)) / 2;
-    PL.x = clamp(PL.x - push, ARENA.left, ARENA.right - MIN_GAP);
-    OP.x = clamp(PL.x + MIN_GAP, ARENA.left + MIN_GAP, ARENA.right);
+    if(Match.online){
+      /* the remote owns its own position, so only we give ground */
+      PL.x = clamp(OP.x - MIN_GAP, ARENA.left, ARENA.right);
+    }else{
+      const push = (MIN_GAP - (OP.x - PL.x)) / 2;
+      PL.x = clamp(PL.x - push, ARENA.left, ARENA.right - MIN_GAP);
+      OP.x = clamp(PL.x + MIN_GAP, ARENA.left + MIN_GAP, ARENA.right);
+    }
   }
   PL.facing = 1; OP.facing = -1;
 }
@@ -1076,6 +1158,7 @@ function matchTick(dt){
     Match.calloutT -= dt;
     if(Match.calloutT <= 0) $("#callout").classList.remove("show");
   }
+  [PL, OP].forEach(f => { if(f && f.ko) f.koT = Math.min(1, f.koT + dt * 2.4); });
   if(Match.state === "countdown"){
     Match.stateT -= dt;
     const n = Math.ceil(Match.stateT);
@@ -1111,7 +1194,7 @@ function matchTick(dt){
     }
   });
 
-  botThink(dt);
+  if(Match.online) applyRemote(); else botThink(dt);
   separate();
 
   [PL, OP].forEach(ft => {
@@ -1119,12 +1202,19 @@ function matchTick(dt){
     ft.stun = Math.max(0, ft.stun - dt);
     ft.animT = Math.max(0, ft.animT - dt);
     if(ft.animT <= 0) ft.anim = ft.blocking ? "BLOCK" : "GUARD";
+    const vx = (ft.x - ft.prevX) / Math.max(dt, .001);
+    ft.vx = lerp(ft.vx, vx, .35);
+    ft.prevX = ft.x;
+    ft.walk += dt * (8 + Math.abs(ft.vx) * 12);
   });
 
   Match.comboT -= dt;
   if(Match.comboT <= 0) Match.combo = 0;
   Match.timer -= dt;
-  if(Match.timer <= 0) endRound(PL.hp >= OP.hp);
+  if(Match.timer <= 0){
+    if(Match.online) endOnline(PL.hp >= OP.hp);
+    else endRound(PL.hp >= OP.hp);
+  }
 
   for(let i = dmgFx.length - 1; i >= 0; i--){ dmgFx[i].life -= dt; if(dmgFx[i].life <= 0) dmgFx.splice(i,1); }
   for(let i = hitFx.length - 1; i >= 0; i--){ hitFx[i].life -= dt; if(hitFx[i].life <= 0) hitFx.splice(i,1); }
@@ -1161,6 +1251,167 @@ function togglePause(){
 }
 
 /* ============================================================
+   5b. PAIRING — direct peer-to-peer, no game server.
+       Each side owns its own fighter and reports what it did.
+   ============================================================ */
+const Net = {
+  peer:null, conn:null, on:false, host:false, code:"",
+  remote:null, remoteFighter:"KESTREL", lastSend:0, ping:0, pingSent:0
+};
+const CODE_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+const roomId = c => "motionbrawler-v1-" + c;
+
+async function getPeer(id){
+  const { Peer } = await import("https://esm.sh/peerjs@1.5.4");
+  return new Peer(id, { debug:0 });
+}
+function netStatus(s, cls){
+  $("#netStatus").textContent = s;
+  if(cls) toast(s);
+}
+function wireConn(conn){
+  Net.conn = conn;
+  conn.on("open", () => {
+    Net.on = true;
+    netStatus("Connected");
+    $("#netPeer").textContent = conn.peer.replace(roomId(""), "") || "friend";
+    $("#btnNetFight").disabled = !Net.host;
+    if(!Net.host) $("#joinStatus").textContent = "Connected — waiting for the host to start.";
+    else $("#hostStatus").textContent = "Player joined. Start when you are both ready.";
+    netSend({ t:"hello", f:P.fighter });
+    setInterval(() => { if(Net.on){ Net.pingSent = performance.now(); netSend({ t:"ping" }); } }, 2000);
+  });
+  conn.on("data", onNetData);
+  conn.on("close", () => {
+    Net.on = false; netStatus("Opponent disconnected");
+    $("#btnNetFight").disabled = true;
+    if(Match.on && Match.online) endOnline(true, "Opponent left");
+  });
+  conn.on("error", e => netStatus("Connection error: " + e.type));
+}
+function netSend(m){
+  if(Net.conn && Net.conn.open){ try{ Net.conn.send(m); }catch(e){} }
+}
+function onNetData(m){
+  if(m.t === "ping"){ netSend({ t:"pong" }); return; }
+  if(m.t === "pong"){
+    Net.ping = Math.round(performance.now() - Net.pingSent);
+    $("#netPing").textContent = Net.ping + " ms"; return;
+  }
+  if(m.t === "hello"){ Net.remoteFighter = m.f || "KESTREL"; return; }
+  if(m.t === "start"){ Net.remoteFighter = m.f || Net.remoteFighter; startMatch(true); return; }
+  if(m.t === "s"){ Net.remote = m; return; }
+  if(m.t === "h" && Match.on){
+    /* the opponent landed one on us — they computed it, we apply it */
+    PL.hp = Math.max(0, PL.hp - m.d);
+    PL.stun = .2;
+    dmgFx.push({ x:PL.x, y:.42, v:m.d, life:.9, crit:m.z === "HEAD",
+                 zone:m.z, jx:(Math.random()-.5)*.06, jy:Math.random()*.55 });
+    hitFx.push({ x:PL.x, y:.45, life:.22, big:m.z === "HEAD" });
+    Match.combo = 0;
+    if(PL.hp <= 0){ netSend({ t:"ko" }); endOnline(false); }
+    return;
+  }
+  if(m.t === "ko" && Match.on){ endOnline(true); return; }
+}
+function netTick(now){
+  if(!Net.on || !Match.on || !Match.online) return;
+  if(now - Net.lastSend < 50) return;
+  Net.lastSend = now;
+  const live = (Pose.running && Pose.cal) ? liveRig() : null;
+  const packed = live ? Object.keys(live).map(k => [Math.round(live[k][0]*100)/100,
+                                                    Math.round(live[k][1]*100)/100]) : null;
+  netSend({ t:"s", x:PL.x, a:PL.anim, at:PL.animT, hp:PL.hp, st:PL.st,
+            ko:PL.ko, r:packed });
+}
+/* REST is declared further down, so resolve the key order on first use */
+let _rigKeys = null;
+const rigKeys = () => (_rigKeys || (_rigKeys = Object.keys(REST)));
+function applyRemote(){
+  const m = Net.remote;
+  if(!m || !OP) return;
+  OP.x = 1 - m.x;                      /* their left is our right */
+  OP.anim = m.a; OP.animT = m.at;
+  OP.hp = m.hp; OP.st = m.st; OP.ko = !!m.ko;
+  if(m.r){
+    const r = {};
+    rigKeys().forEach((k,i) => { if(m.r[i]) r[k] = [m.r[i][0], m.r[i][1]]; });
+    OP.netRig = r;
+  } else OP.netRig = null;
+}
+function endOnline(won, why){
+  Match.on = false;
+  P.matches++;
+  if(won){ P.wins++; P.streak++; P.onlineWins++; } else { P.losses++; P.streak = 0; }
+  const xp = won ? 520 : 120, coins = won ? 300 : 60;
+  const rp = won ? 28 : -15;
+  const leveled = grant(xp, coins, rp);
+  $("#verdict").textContent = won ? "Victory" : "Defeat";
+  $("#verdict").classList.toggle("win", won);
+  $("#verdictSub").textContent = why || ("ONLINE MATCH · " + (won ? "YOU WIN" : "YOU LOSE"));
+  $("#rwXp").textContent = "+" + xp + " XP";
+  $("#rwCoin").textContent = "+" + coins;
+  $("#rwRp").textContent = (rp >= 0 ? "+" : "") + rp + " RP";
+  $("#lvLine").textContent = "Level " + P.lv + (leveled ? " (levelled up)" : "");
+  $("#xpLine").textContent = P.xp + " / " + xpForLevel(P.lv);
+  $("#xpBar").style.width = (P.xp / xpForLevel(P.lv) * 100) + "%";
+  $("#resChips").innerHTML = ["ONLINE", "TOP COMBO x" + Match.best, "HITS " + Match.hits,
+    Net.ping ? "PING " + Net.ping + "MS" : "P2P"]
+    .map(c => '<span class="pill live">' + c + "</span>").join("");
+  go("result");
+}
+
+$("#btnHost").addEventListener("click", async () => {
+  $("#btnHost").disabled = true;
+  netStatus("Opening room…");
+  let code = "";
+  for(let i = 0; i < 4; i++) code += CODE_CHARS[Math.floor(Math.random() * CODE_CHARS.length)];
+  try{
+    Net.peer = await getPeer(roomId(code));
+    Net.host = true; Net.code = code;
+    Net.peer.on("open", () => {
+      $("#hostBox").style.display = "grid";
+      $("#roomCode").textContent = code;
+      netStatus("Room open — waiting");
+    });
+    Net.peer.on("connection", wireConn);
+    Net.peer.on("error", e => {
+      netStatus("Could not open a room: " + e.type);
+      $("#btnHost").disabled = false;
+    });
+  }catch(e){
+    netStatus("Pairing unavailable: " + e.message);
+    $("#btnHost").disabled = false;
+  }
+});
+$("#btnJoin").addEventListener("click", async () => {
+  const code = ($("#joinCode").value || "").trim().toUpperCase();
+  if(code.length !== 4){ $("#joinStatus").textContent = "That code needs to be 4 characters."; return; }
+  $("#joinStatus").textContent = "Connecting…";
+  try{
+    Net.peer = await getPeer(undefined);
+    Net.host = false; Net.code = code;
+    Net.peer.on("open", () => wireConn(Net.peer.connect(roomId(code), { reliable:false })));
+    Net.peer.on("error", e => {
+      $("#joinStatus").textContent = e.type === "peer-unavailable"
+        ? "No room with that code. Check it and try again." : "Connection error: " + e.type;
+    });
+  }catch(e){ $("#joinStatus").textContent = "Pairing unavailable: " + e.message; }
+});
+$("#btnNetFight").addEventListener("click", () => {
+  netSend({ t:"start", f:P.fighter });
+  startMatch(true);
+});
+$("#btnNetLeave").addEventListener("click", () => {
+  if(Net.conn) Net.conn.close();
+  if(Net.peer) Net.peer.destroy();
+  Net.on = false; Net.peer = null; Net.conn = null;
+  $("#btnHost").disabled = false; $("#hostBox").style.display = "none";
+  $("#btnNetFight").disabled = true;
+  netStatus("Not connected");
+});
+
+/* ============================================================
    6. RENDER
    ============================================================ */
 function ctxOf(cv){
@@ -1178,7 +1429,7 @@ function ctxOf(cv){
    your real proportions regardless of distance from the camera */
 const REST = {
   nose:[0,-1.28], neck:[0,-1.0], shL:[-.40,-1.0], shR:[.40,-1.0],
-  elL:[-.55,-.55], elR:[.55,-.55], wrL:[-.26,-.92], wrR:[.26,-.92],
+  elL:[-.74,-.48], elR:[.74,-.48], wrL:[-.34,-1.02], wrR:[.34,-1.02],
   hip:[0,0], hpL:[-.28,0], hpR:[.28,0],
   knL:[-.26,.72], knR:[.26,.72], anL:[-.24,1.42], anR:[.24,1.42]
 };
@@ -1202,38 +1453,195 @@ function liveRig(){
     anL:map(s[L.ANKL]), anR:map(s[L.ANKR])
   };
 }
+/* ---- animation states: idle breath, walk cycle, punch, block,
+        hit recoil, knockout fall, victory ---- */
 function animRig(ft, t){
   const r = {}; for(const k in REST) r[k] = REST[k].slice();
-  const br = Math.sin(t * 2.4) * .02;
-  r.nose[1] += br; r.neck[1] += br; r.shL[1] += br; r.shR[1] += br;
-  if(ft.anim === "BLOCK"){
-    r.wrL = [-.20,-1.24]; r.wrR = [.20,-1.24]; r.elL = [-.48,-.78]; r.elR = [.48,-.78];
-  } else if(ft.anim === "PUNCH_L" || ft.anim === "PUNCH_R"){
-    const s = ft.anim === "PUNCH_L" ? "L" : "R";
-    const k = ft.facing >= 0 ? 1 : -1;
-    r["wr"+s] = [1.15 * k, -.96]; r["el"+s] = [.62 * k, -.92];
+  const k = ft.facing >= 0 ? 1 : -1;
+
+  if(ft.ko){
+    r.knL = [-.34,.52]; r.knR = [.34,.52]; r.anL = [-.62,.98]; r.anR = [.62,.98];
+    r.elL = [-.86,-.22]; r.elR = [.86,-.22]; r.wrL = [-1.0,.16]; r.wrR = [1.0,.16];
+    r.nose = [0,-1.16];
+    return r;
   }
-  if(ft.stun > 0){ r.nose[0] -= ft.facing * .12; r.neck[0] -= ft.facing * .06; }
+  if(ft.win){
+    const p = Math.sin(t * 4) * .12;
+    r.elL = [-.80,-1.28]; r.elR = [.80,-1.28];
+    r.wrL = [-.66,-1.86 + p]; r.wrR = [.66,-1.86 - p];
+    r.nose[1] += Math.sin(t * 4) * .03;
+    return r;
+  }
+
+  const br = Math.sin(t * 2.4) * .022;
+  ["nose","neck","shL","shR"].forEach(j => r[j][1] += br);
+  ["elL","elR","wrL","wrR"].forEach(j => r[j][1] += br * .6);
+
+  /* walk cycle scales with how fast the fighter is actually moving */
+  const gait = clamp(Math.abs(ft.vx) * 9, 0, 1);
+  if(gait > .02){
+    const sw = Math.sin(ft.walk) * gait;
+    r.knL[0] += sw * .22; r.anL[0] += sw * .38; r.anL[1] -= Math.max(0, sw) * .12;
+    r.knR[0] -= sw * .22; r.anR[0] -= sw * .38; r.anR[1] -= Math.max(0, -sw) * .12;
+    r.hip[1] += Math.abs(sw) * .04;
+    r.wrL[0] -= sw * .10; r.wrR[0] += sw * .10;
+  }
+
+  if(ft.anim === "BLOCK"){
+    r.elL = [-.60,-.78]; r.elR = [.60,-.78];
+    r.wrL = [-.24,-1.34]; r.wrR = [.24,-1.34];
+  }else if(ft.anim === "PUNCH_L" || ft.anim === "PUNCH_R"){
+    const s = ft.anim === "PUNCH_L" ? "L" : "R";
+    const prog = 1 - clamp(ft.animT / .22, 0, 1);
+    const ext = .58 + 1.28 * Math.sin(clamp(prog * 1.7, 0, 1) * Math.PI * .5);
+    r["wr" + s] = [ext * k, -1.02];
+    r["el" + s] = [ext * .55 * k, -.98];
+    r.neck[0] += .10 * k; r.nose[0] += .14 * k;
+    r.shL[0] += .08 * k; r.shR[0] += .08 * k;
+  }
+  if(ft.stun > 0){
+    const s = clamp(ft.stun * 3.5, 0, 1);
+    r.nose[0] -= k * .20 * s; r.neck[0] -= k * .11 * s;
+    r.shL[0] -= k * .07 * s; r.shR[0] -= k * .07 * s;
+  }
   return r;
 }
-function drawFighter(c, rig, cx, groundY, unit, facing, opts){
+
+/* an outlined limb: black casing, then the fill inside it */
+function limb(c, A, B, w, fill, ol){
+  c.lineCap = "round";
+  c.strokeStyle = "#000"; c.lineWidth = w + ol * 2;
+  c.beginPath(); c.moveTo(A[0], A[1]); c.lineTo(B[0], B[1]); c.stroke();
+  c.strokeStyle = fill; c.lineWidth = w;
+  c.beginPath(); c.moveTo(A[0], A[1]); c.lineTo(B[0], B[1]); c.stroke();
+}
+function blob(c, at, r, fill, ol){
+  c.beginPath(); c.arc(at[0], at[1], r, 0, 7);
+  c.fillStyle = fill; c.fill();
+  c.lineWidth = ol * 2; c.strokeStyle = "#000"; c.stroke();
+}
+
+function drawCharacter(c, rig, cx, groundY, unit, facing, opts){
   opts = opts || {};
+  const ko = opts.koT || 0;
   const P2 = j => [ cx + rig[j][0] * unit * facing, groundY + (rig[j][1] - 1.42) * unit ];
-  const path = new Path2D();
-  RIG_BONES.forEach(b => {
-    const A = P2(b[0]), B = P2(b[1]);
-    path.moveTo(A[0], A[1]); path.lineTo(B[0], B[1]);
-  });
-  c.lineCap = "round"; c.lineJoin = "round";
-  if(opts.glow){
-    c.strokeStyle = "#FFC800"; c.lineWidth = unit * .26; c.stroke(path);
+  const ol = unit * .035;
+  const WH = "#FFF", GY = "#D8D8D8", YL = "#FFC800";
+  const id = opts.id || "RIVET";
+
+  c.save();
+  if(ko > 0){                                   /* fall over on knockout */
+    c.translate(cx, groundY); c.rotate(-facing * ko * 1.35); c.translate(-cx, -groundY);
   }
-  c.strokeStyle = "#000"; c.lineWidth = unit * (opts.thick ? .10 : .085);
-  c.stroke(path);
-  const h = P2("nose");
-  c.beginPath(); c.arc(h[0], h[1], unit * .17, 0, 7);
-  c.fillStyle = opts.glow ? "#FFC800" : "#FFF"; c.fill();
-  c.lineWidth = unit * .07; c.strokeStyle = "#000"; c.stroke();
+  /* contact shadow */
+  c.beginPath();
+  c.ellipse(cx, groundY + unit * .04, unit * .52, unit * .085, 0, 0, 7);
+  c.fillStyle = "#D8D8D8"; c.fill();
+
+  if(opts.glow){                                /* attack flash behind the body */
+    const g = new Path2D();
+    RIG_BONES.forEach(b => { const A = P2(b[0]), B = P2(b[1]); g.moveTo(A[0],A[1]); g.lineTo(B[0],B[1]); });
+    c.strokeStyle = YL; c.lineWidth = unit * .46; c.lineCap = "round"; c.lineJoin = "round";
+    c.stroke(g);
+  }
+
+  /* back leg, back arm read as shaded so the pose has depth */
+  limb(c, P2("hpR"), P2("knR"), unit * .19, GY, ol);
+  limb(c, P2("knR"), P2("anR"), unit * .155, GY, ol);
+  limb(c, P2("hpL"), P2("knL"), unit * .20, WH, ol);
+  limb(c, P2("knL"), P2("anL"), unit * .165, WH, ol);
+  /* boots */
+  [["anR",GY],["anL",WH]].forEach(([j,f]) => {
+    const a = P2(j);
+    c.beginPath();
+    c.ellipse(a[0] + facing * unit * .07, a[1] + unit * .02, unit * .17, unit * .10, 0, 0, 7);
+    c.fillStyle = "#000"; c.fill();
+  });
+
+  /* torso */
+  const sL = P2("shL"), sR = P2("shR"), hL = P2("hpL"), hR = P2("hpR");
+  c.beginPath();
+  c.moveTo(sL[0], sL[1]); c.lineTo(sR[0], sR[1]);
+  c.lineTo(hR[0], hR[1]); c.lineTo(hL[0], hL[1]); c.closePath();
+  c.fillStyle = WH; c.fill();
+  c.lineWidth = ol * 2; c.strokeStyle = "#000"; c.lineJoin = "round"; c.stroke();
+  /* belt */
+  c.beginPath();
+  c.moveTo(hL[0], hL[1] - unit * .10); c.lineTo(hR[0], hR[1] - unit * .10);
+  c.lineTo(hR[0], hR[1] + unit * .04); c.lineTo(hL[0], hL[1] + unit * .04); c.closePath();
+  c.fillStyle = YL; c.fill(); c.lineWidth = ol * 1.6; c.stroke();
+
+  /* chest mark, per fighter */
+  const mid2 = [(sL[0]+hL[0]+sR[0]+hR[0])/4, (sL[1]+hL[1]+sR[1]+hR[1])/4];
+  c.lineWidth = ol * 1.8; c.strokeStyle = "#000";
+  if(id === "MAYDAY"){
+    c.strokeStyle = YL; c.lineWidth = ol * 2.6;
+    c.beginPath();
+    c.moveTo(mid2[0] - unit*.13, mid2[1]); c.lineTo(mid2[0] + unit*.13, mid2[1]);
+    c.moveTo(mid2[0], mid2[1] - unit*.13); c.lineTo(mid2[0], mid2[1] + unit*.13);
+    c.stroke();
+  }else if(id === "FUSEBOX"){
+    c.fillStyle = YL;
+    c.beginPath();
+    c.moveTo(mid2[0] + unit*.06, mid2[1] - unit*.16);
+    c.lineTo(mid2[0] - unit*.07, mid2[1] + unit*.02);
+    c.lineTo(mid2[0] + unit*.01, mid2[1] + unit*.02);
+    c.lineTo(mid2[0] - unit*.05, mid2[1] + unit*.17);
+    c.lineTo(mid2[0] + unit*.10, mid2[1] - unit*.03);
+    c.lineTo(mid2[0] + unit*.02, mid2[1] - unit*.03);
+    c.closePath(); c.fill(); c.lineWidth = ol; c.stroke();
+  }else if(id === "PANEL"){
+    c.strokeStyle = YL; c.lineWidth = ol * 2.2;
+    c.strokeRect(mid2[0] - unit*.12, mid2[1] - unit*.10, unit*.24, unit*.20);
+  }
+
+  /* back arm */
+  limb(c, P2("shR"), P2("elR"), unit * .145, GY, ol);
+  limb(c, P2("elR"), P2("wrR"), unit * .125, GY, ol);
+  blob(c, P2("wrR"), unit * .155, YL, ol);
+
+  /* head */
+  const hd = P2("nose"), hr = unit * .23;
+  blob(c, hd, hr, WH, ol);
+  if(id === "SLAB"){                              /* hard hat */
+    c.beginPath(); c.arc(hd[0], hd[1] - hr*.16, hr*1.02, Math.PI, 0);
+    c.fillStyle = YL; c.fill(); c.lineWidth = ol*2; c.strokeStyle="#000"; c.stroke();
+    c.beginPath();
+    c.moveTo(hd[0] - hr*1.28, hd[1] - hr*.16); c.lineTo(hd[0] + hr*1.28, hd[1] - hr*.16);
+    c.lineWidth = ol*2.4; c.stroke();
+  }else if(id === "KESTREL"){                     /* headband with a tail */
+    c.beginPath();
+    c.moveTo(hd[0] - hr, hd[1] - hr*.34); c.lineTo(hd[0] + hr, hd[1] - hr*.34);
+    c.strokeStyle = YL; c.lineWidth = hr*.42; c.stroke();
+    c.strokeStyle = "#000"; c.lineWidth = ol; c.stroke();
+    c.beginPath();
+    c.moveTo(hd[0] - facing*hr*.9, hd[1] - hr*.34);
+    c.lineTo(hd[0] - facing*hr*1.9, hd[1] + hr*.18);
+    c.strokeStyle = YL; c.lineWidth = hr*.24; c.lineCap="round"; c.stroke();
+  }else if(id === "RIVET"){                       /* welding visor */
+    c.beginPath();
+    c.moveTo(hd[0] - hr, hd[1] - hr*.30); c.lineTo(hd[0] + hr, hd[1] - hr*.30);
+    c.strokeStyle = "#000"; c.lineWidth = hr*.52; c.stroke();
+  }else{
+    c.beginPath();
+    c.moveTo(hd[0] - hr, hd[1] - hr*.38); c.lineTo(hd[0] + hr, hd[1] - hr*.38);
+    c.strokeStyle = YL; c.lineWidth = hr*.30; c.stroke();
+  }
+  /* eyes look where the fighter faces */
+  if(id !== "RIVET" && !opts.koT){
+    c.fillStyle = "#000";
+    [.18,.52].forEach(o => {
+      c.beginPath();
+      c.arc(hd[0] + facing*hr*o, hd[1] + hr*.16, hr*.11, 0, 7); c.fill();
+    });
+  }
+
+  /* front arm on top */
+  limb(c, P2("shL"), P2("elL"), unit * .155, WH, ol);
+  limb(c, P2("elL"), P2("wrL"), unit * .135, WH, ol);
+  blob(c, P2("wrL"), unit * .17, YL, ol);
+
+  c.restore();
 }
 function drawArena(t){
   const g = ctxOf($("#arena")); if(!g) return;
@@ -1249,33 +1657,40 @@ function drawArena(t){
   /* floor */
   c.strokeStyle = "#000"; c.lineWidth = 3;
   c.beginPath(); c.moveTo(0, groundY); c.lineTo(w, groundY); c.stroke();
+  /* camera pans to keep both fighters framed; the floor marks scroll
+     with it so movement reads even when the pair stays centred */
+  const cam = PL ? clamp((PL.x + OP.x) / 2 - .5, -.16, .16) : 0;
+  const X = wx => (wx - cam) * w;
   c.strokeStyle = "#D8D8D8"; c.lineWidth = 1;
-  for(let i = 0; i <= 10; i++){
-    const x = (i/10) * w;
+  for(let i = -2; i <= 12; i++){
+    const x = X(i / 10);
+    if(x < -20 || x > w + 20) continue;
     c.beginPath(); c.moveTo(x, groundY); c.lineTo(x, groundY + h * .05); c.stroke();
   }
   if(!PL) return;
-  const px = PL.x * w, ox = OP.x * w;
+  const px = X(PL.x), ox = X(OP.x);
   /* reach band on the floor, so distance is legible at a glance */
   const inR = Math.abs(PL.x - OP.x) <= PL.reach;
   c.fillStyle = inR ? "#FFC800" : "#F5F5F5";
-  c.fillRect(px, groundY + 3, (OP.x - PL.x) * w, 8);
+  c.fillRect(px, groundY + 3, ox - px, 8);
   c.strokeStyle = "#000"; c.lineWidth = 1;
-  c.strokeRect(px, groundY + 3, (OP.x - PL.x) * w, 8);
+  c.strokeRect(px, groundY + 3, ox - px, 8);
 
-  const live = Pose.running && Pose.cal ? liveRig() : null;
-  drawFighter(c, live || animRig(PL, t), px, groundY, unit, PL.facing,
-    { thick:true, glow: PL.animT > .1 });
-  drawFighter(c, animRig(OP, t), ox, groundY, unit, OP.facing, { glow: OP.animT > .1 });
+  const live = (Pose.running && Pose.cal && !PL.ko && !PL.win) ? liveRig() : null;
+  drawCharacter(c, live || animRig(PL, t), px, groundY, unit, PL.facing,
+    { id:PL.f.id, glow: PL.animT > .1, koT: PL.koT });
+  const oRig = (Match.online && OP.netRig && !OP.ko) ? OP.netRig : animRig(OP, t);
+  drawCharacter(c, oRig, ox, groundY, unit, OP.facing,
+    { id:OP.f.id, glow: OP.animT > .1, koT: OP.koT });
 
   hitFx.forEach(f => {
     const r = unit * (f.big ? .95 : .6) * (1 - f.life / .22);
     c.strokeStyle = "#000"; c.lineWidth = 4;
-    c.beginPath(); c.arc(f.x * w, groundY - unit * 1.1, r, 0, 7); c.stroke();
+    c.beginPath(); c.arc(X(f.x), groundY - unit * 1.1, r, 0, 7); c.stroke();
   });
   c.textAlign = "center";
   dmgFx.forEach(d => {
-    const x = (d.x + d.jx) * w;
+    const x = X(d.x + d.jx);
     const y = groundY - unit * (3.1 + d.jy) - (0.9 - d.life) * 40;
     const fs = Math.round(unit * (d.crit ? .50 : .38));
     c.globalAlpha = Math.min(1, d.life * 2.4);
@@ -1354,9 +1769,12 @@ $("#btnStartCam").addEventListener("click", startCamera);
 $("#btnCalib").addEventListener("click", calibrate);
 $("#btnMirror").addEventListener("click", () => {
   Pose.mirror = !Pose.mirror;
+  applyMirror(); P.mirror = Pose.mirror; save();
+});
+function applyMirror(){
   $("#cam").classList.toggle("mirror", Pose.mirror);
   $("#pipCam").classList.toggle("mirror", Pose.mirror);
-});
+}
 $("#btnFight").addEventListener("click", startMatch);
 $("#btnRematch").addEventListener("click", startMatch);
 $("#btnResume").addEventListener("click", togglePause);
@@ -1522,13 +1940,17 @@ function frame(now){
   pollKeyboard();
   if(toastT > 0){ toastT -= dt; if(toastT <= 0) $("#toast").classList.remove("show"); }
   if(Screen.now === "setup"){ drawOverlay($("#overlay")); paintSetup(); }
-  if(Screen.now === "fight"){ matchTick(dt); drawArena(now / 1000); drawOverlay($("#pipC")); }
+  if(Screen.now === "fight"){ matchTick(dt); netTick(now); drawArena(now / 1000); drawOverlay($("#pipC")); }
   requestAnimationFrame(frame);
 }
 
+/* restore device-local state */
+Pose.mirror = P.mirror !== false;
+if(P.cal) Pose.cal = P.cal;
+applyMirror(); paintCal();
 paintTopbar(); paintTitle();
 const initial = location.hash.slice(1);
-if(["title","setup","select","shop","profile"].indexOf(initial) >= 0) go(initial);
+if(["title","setup","select","shop","profile","online"].indexOf(initial) >= 0) go(initial);
 requestAnimationFrame(frame);
 </script>
 </body>
