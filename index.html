@@ -262,6 +262,21 @@ kbd{font-family:var(--mono); font-size:11px; border:1px solid var(--ink); paddin
   background:var(--yellow); border:2px solid var(--ink); padding:4px 18px;
   display:inline-block; font-family:var(--mono);
 }
+.gate{
+  position:fixed; inset:0; z-index:60; background:var(--paper);
+  display:none; place-content:center; justify-items:center;
+  gap:14px; text-align:center; padding:26px;
+}
+.gate.on{display:grid}
+.gate p{max-width:54ch; color:var(--grey); margin:0; font-size:14px}
+.gate .row{display:flex; gap:10px; flex-wrap:wrap; justify-content:center}
+.gate .mk{width:70px; height:91px}
+.gate .steps{
+  font-family:var(--mono); font-size:11px; letter-spacing:.08em; text-transform:uppercase;
+  color:var(--grey); border:1px solid var(--rule); padding:8px 12px; max-width:52ch;
+}
+.gate .steps b{color:var(--ink)}
+#tCam{cursor:pointer}
 .toast{
   position:fixed; left:50%; bottom:18px; transform:translateX(-50%);
   background:var(--ink); color:var(--paper); font-family:var(--mono); font-size:12px;
@@ -596,6 +611,19 @@ kbd{font-family:var(--mono); font-size:11px; border:1px solid var(--ink); paddin
     </section>
 
   </div>
+</div>
+
+<div class="gate" id="bootGate">
+  <svg class="mk" viewBox="0 0 200 260" aria-hidden="true"><use href="#mk"></use></svg>
+  <h2 class="h-lg" id="gateTitle">Turn on your camera</h2>
+  <p id="gateText">Motion Brawler reads your body with MediaPipe Pose, so your punches,
+     blocks and steps drive your fighter. Tracking runs inside this tab &mdash; no video is uploaded.</p>
+  <div class="steps">Stand back until your <b>head, hands and hips</b> are all in frame.</div>
+  <div class="row">
+    <button class="btn primary big" id="gateStart">Turn on camera</button>
+    <button class="btn" id="gateSkip">Play with keyboard</button>
+  </div>
+  <p class="note" id="gateHint"></p>
 </div>
 
 <div class="toast" id="toast"></div>
@@ -1951,6 +1979,68 @@ applyMirror(); paintCal();
 paintTopbar(); paintTitle();
 const initial = location.hash.slice(1);
 if(["title","setup","select","shop","profile","online"].indexOf(initial) >= 0) go(initial);
+
+/* ============================================================
+   9. STARTUP CAMERA GATE
+   Asks on every load. If the browser already remembers the
+   permission, it just starts and gets out of the way.
+   ============================================================ */
+const gateEl = $("#bootGate");
+function closeGate(){ gateEl.classList.remove("on"); }
+function openGate(){
+  gateEl.classList.add("on");
+  $("#gateStart").disabled = false;
+  $("#gateStart").textContent = Pose.running ? "Restart camera" : "Turn on camera";
+  $("#gateSkip").textContent = Pose.running ? "Back to the game" : "Play with keyboard";
+  $("#gateHint").textContent = "";
+}
+async function cameraPermission(){
+  try{
+    if(navigator.permissions && navigator.permissions.query)
+      return (await navigator.permissions.query({ name:"camera" })).state;
+  }catch(e){}
+  return "prompt";
+}
+async function runGateStart(){
+  $("#gateStart").disabled = true;
+  $("#gateHint").textContent = "Waiting for your browser to allow the camera…";
+  await startCamera();
+  if(Pose.running){
+    closeGate();
+    toast(Pose.cal ? "Camera live — your saved calibration is loaded."
+                   : "Camera live. Stand in frame and it will calibrate itself.");
+  }else{
+    $("#gateStart").disabled = false;
+    $("#gateStart").textContent = "Try again";
+    $("#gateHint").textContent = (Pose.error && Pose.error.message) || "The camera could not be started.";
+  }
+}
+async function bootCamera(){
+  openGate();
+  const state = await cameraPermission();
+  if(state === "granted"){
+    $("#gateTitle").textContent = "Starting your camera";
+    $("#gateHint").textContent = "Already allowed on this device.";
+    $("#gateStart").disabled = true;
+    await runGateStart();
+    return;
+  }
+  if(state === "denied"){
+    $("#gateTitle").textContent = "Your browser is blocking the camera";
+    $("#gateText").innerHTML = "Click the camera icon in the address bar, allow this site, then reload. " +
+      "You can still play on the keyboard in the meantime.";
+    $("#gateStart").textContent = "Try anyway";
+  }
+}
+$("#gateStart").addEventListener("click", runGateStart);
+$("#gateSkip").addEventListener("click", () => {
+  closeGate();
+  if(!Pose.running) toast("Keyboard controls active. Press the camera pill up top to switch on.");
+});
+$("#tCam").addEventListener("click", openGate);
+addEventListener("keydown", e => { if(e.key === "Escape" && gateEl.classList.contains("on")) closeGate(); });
+
+bootCamera();
 requestAnimationFrame(frame);
 </script>
 </body>
