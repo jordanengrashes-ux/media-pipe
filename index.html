@@ -1056,6 +1056,15 @@ function recognize(dt){
 
   /* posture booleans */
   const bothUp = s[L.WRL].y < nose.y && s[L.WRR].y < nose.y;
+  /* Blocking used to demand both wrists above your nose, which is an
+     awkward pose to hold. A single hand brought up to your head now
+     guards, the way it actually works in a fight — both hands still
+     guard harder. */
+  const headR = (Pose.faceCenter ? Pose.faceCenter.h : cal.torso * .48) * 1.55;
+  const nearHead = wr => wr.y < nose.y + headR * .55 &&
+                         Math.hypot(wr.x - nose.x, wr.y - nose.y) < headR;
+  const guardL = nearHead(s[L.WRL]), guardR = nearHead(s[L.WRR]);
+  const guardLevel = bothUp ? 2 : (guardL && guardR) ? 2 : (guardL || guardR) ? 1 : 0;
   const crouch = hp.y > cal.hipY + cal.torso * .28;
   const scale = dist(s[L.SHL], s[L.SHR]) / cal.shoulderW;   /* lean in => wider */
 
@@ -1091,7 +1100,8 @@ function recognize(dt){
     Pose.action = "SIDE KICK"; Pose.actionUntil = now + 420;
   }
 
-  Input.block = bothUp && !cool("ult");
+  Input.block = guardLevel > 0 && !cool("ult");
+  Input.guard = guardLevel;
   Input.crouch = crouch;
   Input.lean = clamp((scale - 1) * 2.4, -1, 1);
   Input.strafe = 0;
@@ -1141,7 +1151,7 @@ function recognize(dt){
 
   if(!Pose.actionUntil || now > Pose.actionUntil){
     const off = Input.posX - .5;
-    Pose.action = Input.block ? "BLOCK" :
+    Pose.action = Input.block ? (Input.guard >= 2 ? "BLOCK" : "GUARD (ONE ARM)") :
       crouch ? "CROUCH" :
       off < -.10 ? "MOVE LEFT" : off > .10 ? "MOVE RIGHT" :
       Input.lean > .3 ? "STEP IN" : Input.lean < -.3 ? "STEP BACK" : "GUARD";
@@ -1316,6 +1326,7 @@ addEventListener("keyup", e => { keyState[e.key.toLowerCase()] = false; });
 function pollKeyboard(){
   if(Pose.running && Pose.cal) return;          /* tracking owns the stick */
   Input.block  = !!keyState["shift"];
+  Input.guard = keyState["shift"] ? 2 : 0;
   Input.crouch = !!keyState["c"];
   Input.lean   = (keyState["w"] ? 1 : 0) - (keyState["x"] ? 1 : 0);
   Input.strafe = (keyState["e"] ? 1 : 0) - (keyState["q"] ? 1 : 0);
@@ -1585,7 +1596,8 @@ function applyHit(attacker, defender, ev){
   const zoneF = ZONES[ev.zone] || 1;
   const stF = attacker.st < 15 ? .7 : 1;
   const defF = 1 - (defender.defense / 100) * .22;
-  let blockF = defender.blocking ? .2 : 1;
+  const guardLvl = defender.blocking ? (defender.guard === 1 ? 1 : 2) : 0;
+  let blockF = guardLvl === 2 ? .2 : guardLvl === 1 ? .45 : 1;
   if(defender.armor > 0){ blockF *= .45; defender.armor -= 1; }
   const powF = .8 + (attacker.power / 100) * .45;
   let dmg = DMG_BASE * speedF * zoneF * powF * defF * blockF * stF;
@@ -1788,6 +1800,7 @@ function matchTick(dt){
 
   /* player movement from lean/strafe */
   PL.blocking = Input.block;
+  PL.guard = Input.guard || 0;
   PL.crouching = Input.crouch;
   if(Input.posActive){
     /* your position in frame IS your position in the arena */
@@ -2217,8 +2230,12 @@ function animRig(ft, t){
   }
 
   if(ft.anim === "BLOCK"){
-    r.elL = [-.60,-.78]; r.elR = [.60,-.78];
-    r.wrL = [-.24,-1.34]; r.wrR = [.24,-1.34];
+    if(ft.guard === 1){                     /* one arm up, the other still free */
+      r.elL = [-.60,-.78]; r.wrL = [-.24,-1.34];
+    }else{
+      r.elL = [-.60,-.78]; r.elR = [.60,-.78];
+      r.wrL = [-.24,-1.34]; r.wrR = [.24,-1.34];
+    }
   }else if(ft.anim === "PUNCH_L" || ft.anim === "PUNCH_R"){
     const s = ft.anim === "PUNCH_L" ? "L" : "R";
     const prog = 1 - clamp(ft.animT / .22, 0, 1);
@@ -2853,7 +2870,7 @@ function paintProfile(){
 const GESTURES = [
   ["Left punch","Thrust your left hand out","LEFT PUNCH"],
   ["Right punch","Thrust your right hand out","RIGHT PUNCH"],
-  ["Block","Both forearms up past your face","BLOCK"],
+  ["Block","A hand up by your head","BLOCK|GUARD (ONE ARM)"],
   ["Crouch","Drop your hips","CROUCH"],
   ["Step in / back","Lean toward or away from camera","STEP IN|STEP BACK"],
   ["Dodge","Shift your body left or right","DODGE LEFT|DODGE RIGHT"],
