@@ -304,6 +304,20 @@ kbd{font-family:var(--mono); font-size:11px; border:1px solid var(--ink); paddin
   font-family:var(--mono); font-size:9px; font-style:normal; display:grid; place-items:center; color:var(--grey);
 }
 .fing i.up{background:var(--yellow); border-color:var(--ink); color:var(--ink)}
+.auth-form{display:grid; gap:10px; max-width:340px; width:100%}
+.auth-form input{
+  font-family:var(--mono); font-size:14px; padding:10px 11px;
+  border:1px solid var(--rule); background:var(--paper); color:var(--ink); width:100%;
+}
+.auth-form input:focus{border-color:var(--ink); outline:none}
+.auth-tabs{display:flex; border:1px solid var(--ink)}
+.auth-tabs button{
+  flex:1; background:none; border:0; cursor:pointer; padding:9px 0; font-weight:700;
+  font-size:12px; letter-spacing:.09em; text-transform:uppercase; color:var(--grey);
+}
+.auth-tabs button.on{background:var(--yellow); color:var(--ink)}
+.auth-msg{font-family:var(--mono); font-size:11.5px; color:var(--grey); min-height:16px; margin:0}
+#tAcct{cursor:pointer}
 .toast{
   position:fixed; left:50%; bottom:18px; transform:translateX(-50%);
   background:var(--ink); color:var(--paper); font-family:var(--mono); font-size:12px;
@@ -350,6 +364,7 @@ kbd{font-family:var(--mono); font-size:11px; border:1px solid var(--ink); paddin
     <span class="hudstat">LV <b id="tLv">1</b></span>
     <span class="hudstat">XP <b id="tXp">0</b></span>
     <span class="hudstat coin">COINS <b id="tCoins">0</b></span>
+    <span class="pill" id="tAcct">SIGNED OUT</span>
     <span class="pill" id="tCam">CAMERA OFF</span>
   </header>
 
@@ -373,6 +388,7 @@ kbd{font-family:var(--mono); font-size:11px; border:1px solid var(--ink); paddin
           <button class="btn quiet" id="btnTrain2">Training</button>
           <button class="btn quiet" data-go="shop">Shop</button>
           <button class="btn quiet" data-go="profile">Profile</button>
+          <button class="btn quiet" data-go="account">Account</button>
           <button class="btn quiet" id="btnHowto">How to play</button>
         </div>
         <div class="title-stats" id="titleStats"></div>
@@ -608,6 +624,41 @@ kbd{font-family:var(--mono); font-size:11px; border:1px solid var(--ink); paddin
       </div>
     </section>
 
+    <!-- ===================== ACCOUNT ===================== -->
+    <section class="screen" id="s-account">
+      <div class="pad" style="align-items:center; text-align:center">
+        <h2 class="h-lg">Account</h2>
+        <p class="muted" style="max-width:52ch; margin:0" id="acctBlurb">
+          Sign in to keep your fighters, coins and streak on your account instead of this one browser.</p>
+
+        <div id="acctOut" style="display:grid; gap:12px; justify-items:center; width:100%">
+          <div class="auth-tabs" style="max-width:340px; width:100%">
+            <button id="tabIn" class="on">Sign in</button>
+            <button id="tabUp">Create account</button>
+          </div>
+          <div class="auth-form">
+            <input id="acctUser" placeholder="username" autocomplete="username" spellcheck="false">
+            <input id="acctMail" placeholder="email (optional)" autocomplete="email" style="display:none">
+            <input id="acctPass" type="password" placeholder="password" autocomplete="current-password">
+            <button class="btn primary" id="btnAuth">Sign in</button>
+            <p class="auth-msg" id="acctMsg"></p>
+          </div>
+        </div>
+
+        <div id="acctIn" style="display:none; gap:10px; justify-items:center">
+          <p class="lbl">Signed in as</p>
+          <h3 class="h-md" id="acctWho">&mdash;</h3>
+          <p class="auth-msg" id="acctSync"></p>
+          <div style="display:flex; gap:8px; flex-wrap:wrap; justify-content:center">
+            <button class="btn" id="btnSyncNow">Save to account</button>
+            <button class="btn quiet" id="btnSignOut">Sign out</button>
+          </div>
+        </div>
+
+        <button class="btn quiet" data-go="title" style="margin-top:8px">Back</button>
+      </div>
+    </section>
+
     <!-- ===================== SHOP ===================== -->
     <section class="screen" id="s-shop">
       <div class="pad">
@@ -726,6 +777,7 @@ function loadSave(){
 function save(){
   try{ localStorage.setItem(SAVE_KEY, JSON.stringify(P)); }catch(e){}
   paintTopbar();
+  if(typeof cloudPush === "function") cloudPush();
 }
 /* never lose a session to a closed tab or a crash */
 addEventListener("visibilitychange", () => { if(document.hidden) save(); });
@@ -2365,7 +2417,7 @@ function drawOverlay(cv){
    7. SCREENS
    ============================================================ */
 const Screen = { now:"title" };
-const SCREEN_IDS = ["title","setup","select","fight","result","online","shop","profile"];
+const SCREEN_IDS = ["title","setup","select","fight","result","online","shop","profile","account"];
 function go(id){
   const el = $("#s-" + id);
   if(!el) return;                      /* an unknown hash must not blank the app */
@@ -2375,6 +2427,7 @@ function go(id){
   if(id === "select") paintRoster();
   if(id === "shop") paintShop();
   if(id === "profile") paintProfile();
+  if(id === "account") paintAccount();
   if(id === "title") paintTitle();
   if(id !== "fight") Match.on = false;
   location.hash = id;
@@ -2660,6 +2713,126 @@ function checkLoginStreak(){
 Pose.mirror = P.mirror !== false;
 if(P.cal) Pose.cal = P.cal;
 applyMirror(); paintCal();
+/* ============================================================
+   ACCOUNTS
+   The server is optional. With a database connected you get real
+   sign-in and your save follows you between devices; without one the
+   endpoint reports "off" and the game keeps running from this browser
+   exactly as before, rather than losing your progress to a feature
+   that is not switched on yet.
+   ============================================================ */
+const Cloud = { available:false, user:null, checked:false, busy:false, dirty:false };
+
+async function api(action, payload){
+  const r = await fetch("/api/store?a=" + action, {
+    method: payload ? "POST" : "GET",
+    headers: payload ? { "Content-Type":"application/json" } : undefined,
+    body: payload ? JSON.stringify(payload) : undefined,
+    credentials: "same-origin"
+  });
+  return r.json();
+}
+function paintAccount(){
+  const inEl = $("#acctIn"), outEl = $("#acctOut"), pill = $("#tAcct");
+  if(Cloud.user){
+    inEl.style.display = "grid"; outEl.style.display = "none";
+    $("#acctWho").textContent = Cloud.user;
+    pill.textContent = Cloud.user.toUpperCase();
+    pill.classList.add("on");
+    $("#acctBlurb").textContent = "Your progress saves to this account automatically.";
+  }else{
+    inEl.style.display = "none"; outEl.style.display = "grid";
+    pill.textContent = Cloud.available ? "SIGNED OUT" : "LOCAL SAVE";
+    pill.classList.remove("on");
+    $("#acctBlurb").textContent = Cloud.available
+      ? "Sign in to keep your fighters, coins and streak on your account instead of this one browser."
+      : "Cloud saves are not switched on for this site yet, so progress stays in this browser. Everything still works.";
+    $("#btnAuth").disabled = !Cloud.available;
+    if(!Cloud.available) $("#acctMsg").textContent = "No database connected to this deployment.";
+  }
+}
+async function cloudBoot(){
+  try{
+    const r = await api("me");
+    Cloud.available = !r.off;
+    if(r.ok && r.username){
+      Cloud.user = r.username;
+      if(r.data && typeof r.data === "object"){
+        P = Object.assign({}, DEFAULT_SAVE, r.data);   /* the account wins */
+        try{ localStorage.setItem(SAVE_KEY, JSON.stringify(P)); }catch(e){}
+      }
+    }
+  }catch(e){ Cloud.available = false; }
+  Cloud.checked = true;
+  paintAccount(); paintTopbar(); paintTitle();
+}
+let cloudTimer = 0;
+function cloudPush(){
+  if(!Cloud.user) return;
+  clearTimeout(cloudTimer);
+  cloudTimer = setTimeout(async () => {
+    try{
+      await api("save", { data:P });
+      const el = $("#acctSync");
+      if(el) el.textContent = "Saved to your account just now.";
+    }catch(e){}
+  }, 1200);
+}
+
+let authMode = "login";
+function setAuthMode(m){
+  authMode = m;
+  $("#tabIn").classList.toggle("on", m === "login");
+  $("#tabUp").classList.toggle("on", m === "register");
+  $("#acctMail").style.display = m === "register" ? "block" : "none";
+  $("#btnAuth").textContent = m === "register" ? "Create account" : "Sign in";
+  $("#acctMsg").textContent = "";
+}
+$("#tabIn").addEventListener("click", () => setAuthMode("login"));
+$("#tabUp").addEventListener("click", () => setAuthMode("register"));
+$("#tAcct").addEventListener("click", () => go("account"));
+
+$("#btnAuth").addEventListener("click", async () => {
+  if(Cloud.busy) return;
+  const username = $("#acctUser").value.trim();
+  const password = $("#acctPass").value;
+  const email = $("#acctMail").value.trim();
+  if(!username || !password){ $("#acctMsg").textContent = "Username and password, please."; return; }
+  Cloud.busy = true;
+  $("#btnAuth").disabled = true;
+  $("#acctMsg").textContent = authMode === "register" ? "Creating account…" : "Signing in…";
+  try{
+    const r = await api(authMode, { username, password, email,
+                                    data: authMode === "register" ? P : undefined });
+    if(!r.ok){
+      $("#acctMsg").textContent = r.error || r.reason || "That did not work.";
+    }else{
+      Cloud.user = r.username;
+      if(r.data && typeof r.data === "object") P = Object.assign({}, DEFAULT_SAVE, r.data);
+      save();
+      $("#acctPass").value = "";
+      paintAccount(); paintTitle(); paintTopbar();
+      toast("Signed in as " + r.username + ".");
+      go("title");
+    }
+  }catch(e){ $("#acctMsg").textContent = "Could not reach the server."; }
+  Cloud.busy = false;
+  $("#btnAuth").disabled = false;
+});
+$("#btnSignOut").addEventListener("click", async () => {
+  try{ await api("logout"); }catch(e){}
+  Cloud.user = null;
+  paintAccount(); paintTopbar();
+  toast("Signed out. This browser keeps its own copy of your progress.");
+});
+$("#btnSyncNow").addEventListener("click", async () => {
+  $("#acctSync").textContent = "Saving…";
+  try{
+    const r = await api("save", { data:P });
+    $("#acctSync").textContent = r.ok ? "Saved to your account." : (r.error || "Could not save.");
+  }catch(e){ $("#acctSync").textContent = "Could not reach the server."; }
+});
+
 const dailyBonus = checkLoginStreak();
 paintTopbar(); paintTitle();
 if(dailyBonus){
@@ -2729,6 +2902,7 @@ $("#gateSkip").addEventListener("click", () => {
 $("#tCam").addEventListener("click", openGate);
 addEventListener("keydown", e => { if(e.key === "Escape" && gateEl.classList.contains("on")) closeGate(); });
 
+cloudBoot();
 bootCamera();
 requestAnimationFrame(frame);
 </script>
