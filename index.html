@@ -312,6 +312,35 @@ kbd{font-family:var(--mono); font-size:11px; border:1px solid var(--ink); paddin
 .auth-tabs button.on{background:var(--yellow); color:var(--ink)}
 .auth-msg{font-family:var(--mono); font-size:11.5px; color:var(--grey); min-height:16px; margin:0}
 #tAcct{cursor:pointer}
+.hotbar{
+  position:absolute; left:50%; bottom:10px; transform:translateX(-50%);
+  display:flex; gap:5px; pointer-events:none;
+}
+.slot{
+  width:46px; height:46px; border:2px solid var(--ink); background:var(--paper);
+  display:grid; place-items:center; position:relative; overflow:hidden;
+}
+.slot .k{position:absolute; top:1px; left:3px; font-family:var(--mono); font-size:9px; color:var(--grey)}
+.slot .n{font-size:10px; font-weight:800; text-transform:uppercase; text-align:center; line-height:1.05; padding:0 2px}
+.slot.empty{border-color:var(--rule); background:var(--wash)}
+.slot .cd{position:absolute; inset:0; background:rgba(0,0,0,.55); display:grid; place-items:center;
+  color:#FFF; font-family:var(--mono); font-size:13px; font-weight:700}
+.title-wrap{display:grid; grid-template-columns:236px minmax(0,1fr); height:100%}
+.side-panel{
+  border-right:1px solid var(--ink); padding:14px; display:flex; flex-direction:column;
+  gap:6px; overflow:auto; background:var(--wash);
+}
+.side-panel h3{
+  font-size:11px; font-weight:800; letter-spacing:.12em; text-transform:uppercase;
+  color:var(--grey); margin:6px 0 2px;
+}
+.side-panel .btn{width:100%; text-align:left; padding:9px 12px; font-size:12px}
+@media (max-width:820px){
+  .title-wrap{grid-template-columns:1fr}
+  .side-panel{border-right:0; border-bottom:1px solid var(--ink); flex-direction:row; flex-wrap:wrap}
+  .side-panel h3{display:none}
+  .side-panel .btn{width:auto}
+}
 .toast{
   position:fixed; left:50%; bottom:18px; transform:translateX(-50%);
   background:var(--ink); color:var(--paper); font-family:var(--mono); font-size:12px;
@@ -367,24 +396,29 @@ kbd{font-family:var(--mono); font-size:11px; border:1px solid var(--ink); paddin
 
     <!-- ===================== TITLE ===================== -->
     <section class="screen on" id="s-title">
+      <div class="title-wrap">
+        <aside class="side-panel">
+          <h3>Fight</h3>
+          <button class="btn" data-go="select">Fighters</button>
+          <button class="btn" id="btnTrain2">Training</button>
+          <button class="btn" data-go="online">Play a friend</button>
+          <h3>Loadout</h3>
+          <button class="btn" data-go="abilities">Abilities</button>
+          <button class="btn" data-go="shop">Shop</button>
+          <h3>You</h3>
+          <button class="btn" data-go="profile">Profile</button>
+          <button class="btn" data-go="account">Account</button>
+          <h3>Settings</h3>
+          <button class="btn" id="btnSetup">Camera setup</button>
+          <button class="btn" id="btnModeSide">Input mode</button>
+          <button class="btn" id="btnHowto">How to play</button>
+        </aside>
       <div class="title" style="display:flex; flex-direction:column; flex:1">
         <svg class="mk" viewBox="0 0 200 260"><use href="#mk"></use></svg>
         <h1 class="h-xl">Motion Brawler</h1>
         <p class="sub">Your body is the controller</p>
         <div class="title-acts">
           <button class="btn primary big" id="btnPlay">Play</button>
-          <button class="btn big" id="btnSetup">Camera setup</button>
-        </div>
-        <div class="title-acts" style="margin-top:10px">
-          <button class="btn big" data-go="online">Play a friend</button>
-        </div>
-        <div class="title-acts" style="margin-top:8px">
-          <button class="btn quiet" data-go="select">Fighters</button>
-          <button class="btn quiet" id="btnTrain2">Training</button>
-          <button class="btn quiet" data-go="shop">Shop</button>
-          <button class="btn quiet" data-go="profile">Profile</button>
-          <button class="btn quiet" data-go="account">Account</button>
-          <button class="btn quiet" id="btnHowto">How to play</button>
         </div>
         <div class="title-stats" id="titleStats"></div>
         <p class="note" style="margin-top:18px; max-width:52ch">
@@ -534,6 +568,7 @@ kbd{font-family:var(--mono); font-size:11px; border:1px solid var(--ink); paddin
         </div>
         <span class="pill" id="trainBadge"
               style="position:absolute; left:12px; top:12px; display:none">TRAINING &middot; NOT SCORED</span>
+        <div class="hotbar" id="hotbar"></div>
         <div class="combo" id="comboBox"><b id="comboN">x0</b><span id="comboRate">COMBO</span></div>
         <div class="callout" id="callout"><em>FIGHT</em></div>
         <div class="pause" id="pauseBox">
@@ -650,6 +685,26 @@ kbd{font-family:var(--mono); font-size:11px; border:1px solid var(--ink); paddin
       </div>
     </section>
 
+    <!-- ===================== ABILITIES ===================== -->
+    <section class="screen" id="s-abilities">
+      <div class="pad">
+        <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap">
+          <h2 class="h-lg">Abilities</h2>
+          <span class="hudstat coin">BALANCE <b id="abBal">0</b></span>
+        </div>
+        <p class="muted" style="margin:0; max-width:64ch">
+          Buy an ability with coins, drop it into a hotbar slot, then press its key in a fight.
+          Click a slot to change its key.</p>
+
+        <span class="lbl">Hotbar</span>
+        <div id="abHotbar" style="display:flex; gap:6px; flex-wrap:wrap"></div>
+
+        <span class="lbl" style="margin-top:6px">Owned and available</span>
+        <div class="grid" id="abGrid"></div>
+        <button class="btn quiet" data-go="title" style="justify-self:start">Back</button>
+      </div>
+    </section>
+
     <!-- ===================== SHOP ===================== -->
     <section class="screen" id="s-shop">
       <div class="pad">
@@ -755,7 +810,9 @@ const DEFAULT_SAVE = {
   mirror:true, sensitivity:.62, punchSens:.62, cal:null, name:"you",
   matches:0, totalDmg:0, onlineWins:0,
   loginStreak:0, lastLogin:"", bestLoginStreak:0,
-  inputMode:"auto"
+  inputMode:"auto",
+  abilities:[], hotbar:[null,null,null,null,null,null,null,null,null],
+  keybinds:["1","2","3","4","5","6","7","8","9"]
 };
 function xpForLevel(lv){ return 300 + (lv-1)*250; }
 let P = loadSave();
@@ -862,6 +919,78 @@ const ULTS = {
   HALYARD: { hits:1, dmg:2.3, launch:1, self:2.2, stun:.5,  zone:"HEAD", reach:.14, say:"SLACK LINE" }
 };
 const byId = id => FIGHTERS.find(f => f.id === id) || FIGHTERS[0];
+
+/* Abilities are bought with coins, dropped into one of nine hotbar slots
+   and fired with a key you choose. They lean on the systems the fight
+   already has — launches, armour, stun, knockback — rather than being a
+   parallel set of rules. */
+const ABILITIES = [
+  { id:"DASH",      name:"Dash",         cost:600,  cd:5,  desc:"Burst forward and close the gap at once." },
+  { id:"BACKSTEP",  name:"Backstep",     cost:500,  cd:4,  desc:"Hop clear and reset the spacing." },
+  { id:"SWEEP",     name:"Sweep",        cost:700,  cd:7,  desc:"Low kick that drops them and stuns." },
+  { id:"IRONGUARD", name:"Iron Guard",   cost:800,  cd:12, desc:"Armour that soaks the next three hits." },
+  { id:"HAYMAKER",  name:"Haymaker",     cost:1000, cd:9,  desc:"Slow, enormous, and it launches." },
+  { id:"UPPERCUT",  name:"Uppercut",     cost:900,  cd:8,  desc:"Sends them up for a juggle." },
+  { id:"POUND",     name:"Ground Pound", cost:1200, cd:10, desc:"Slam down and quake the floor." },
+  { id:"WIND",      name:"Second Wind",  cost:1500, cd:20, desc:"Recover a chunk of health." },
+  { id:"OVERDRIVE", name:"Overdrive",    cost:1800, cd:25, desc:"Half again the damage for five seconds." }
+];
+const abilityById = id => ABILITIES.find(a => a.id === id);
+const Cool = {};                       /* id -> time it becomes ready again */
+
+function ownsAbility(id){ return (P.abilities || []).indexOf(id) >= 0; }
+function abilityReady(id){ return (Cool[id] || 0) <= performance.now(); }
+
+function useAbility(slot){
+  if(Screen.now !== "fight" || Match.paused || !Match.on) return;
+  if(PL.stunLock > 0) return;
+  const id = (P.hotbar || [])[slot];
+  if(!id) return;
+  if(!ownsAbility(id)){ toast("You do not own that ability yet."); return; }
+  const a = abilityById(id);
+  if(!abilityReady(id)){
+    toast(a.name + " is still cooling down.");
+    return;
+  }
+  Cool[id] = performance.now() + a.cd * 1000;
+  fireAbility(id);
+}
+
+function fireAbility(id){
+  const me = PL, foe = OP;
+  const gap = Math.abs(me.x - foe.x);
+  switch(id){
+    case "DASH":
+      me.x = clamp(foe.x - me.facing * (BODY_HW + .10), ARENA.left, ARENA.right);
+      shake(.4); callout("DASH", .4); break;
+    case "BACKSTEP":
+      me.kbx -= me.facing * 1.4; me.stun = 0;
+      callout("BACKSTEP", .4); break;
+    case "SWEEP":
+      tryAttack(me, foe, { side:"R", zone:"LOW", speed:3.4, heavy:true, kick:true });
+      foe.stunLock = Math.max(foe.stunLock || 0, 1.0);
+      callout("SWEEP", .5); shake(.8); break;
+    case "IRONGUARD":
+      me.armor = 3; flash(.4); callout("IRON GUARD", .6); break;
+    case "HAYMAKER":
+      tryAttack(me, foe, { side:"R", zone:"HEAD", speed:4.6, heavy:true, launch:true });
+      shake(1.2); freeze(.1); callout("HAYMAKER", .6); break;
+    case "UPPERCUT":
+      tryAttack(me, foe, { side:"L", zone:"HEAD", speed:3.8, heavy:true, launch:true });
+      callout("UPPERCUT", .5); break;
+    case "POUND":
+      me.vy = 0; me.y = 0; me.grounded = true;
+      foe.vy = Math.max(foe.vy, 3.0); foe.grounded = false;
+      tryAttack(me, foe, { side:"R", zone:"LOW", speed:4.0, heavy:true });
+      shake(1.5); freeze(.12); callout("GROUND POUND", .7); break;
+    case "WIND":
+      me.hp = Math.min(me.maxHp, me.hp + 22); flash(.3);
+      callout("SECOND WIND", .6); break;
+    case "OVERDRIVE":
+      Match.boost = 5; flash(.5); callout("OVERDRIVE", .7); break;
+  }
+  if(!me.isBot) logHit(abilityById(id).name.toUpperCase(), gap > me.reach + .1 ? "out of reach" : "");
+}
 const statOf = (f,k) => f.stats[STAT_KEYS.indexOf(k)];
 function isOwned(f){ return P.owned.indexOf(f.id) >= 0; }
 function unlockText(f){
@@ -1329,7 +1458,8 @@ addEventListener("mousedown", e => {
                       zone: mouseZone(), aimY: mouseAimY(), heavy });
 });
 addEventListener("contextmenu", e => { if(Screen.now === "fight") e.preventDefault(); });
-const GAME_KEYS = ["w","a","s","d","x","q","e","c","r","k"," ","shift","arrowup","arrowdown"];
+const GAME_KEYS = ["w","a","s","d","x","q","e","c","r","k"," ","shift",
+  "1","2","3","4","5","6","7","8","9","arrowup","arrowdown"];
 addEventListener("keydown", e => {
   if(e.target.matches("input,textarea")) return;
   const k = e.key.toLowerCase();
@@ -1338,22 +1468,35 @@ addEventListener("keydown", e => {
   keyState[k] = true;
   if(k === "m"){ toggleMirror(); return; }      /* usable on any screen */
   if(Screen.now !== "fight" || Match.paused) return;
-  const zone = keyState["arrowup"] ? "HEAD" : (keyState["c"] ? "LOW" : "BODY");
-  if(k === "a") Input.events.push({ type:"PUNCH", side:"L", speed:2.6, zone });
-  if(k === "d") Input.events.push({ type:"PUNCH", side:"R", speed:2.6, zone });
-  if(k === "s") Input.events.push({ type:"PUNCH", side:"R", speed:3.6, zone:"HEAD", heavy:true });
+  /* A and D walk, S crouches, space jumps. Punching is the mouse, so the
+     keyboard is free for movement and abilities. */
   if(k === "r") Input.events.push({ type:"ULT" });
+  if(k === "q") Input.events.push({ type:"DODGE" });
+  const slot = "123456789".indexOf(k);
+  if(slot >= 0) useAbility(slot);
+  else {
+    const bound = P.keybinds ? P.keybinds.indexOf(k) : -1;
+    if(bound >= 0) useAbility(bound);
+  }
   if(k === " ") Input.events.push({ type:"JUMP", power:1 });
   if(k === "k") Input.events.push({ type:"KICK", dir:1, speed:2.8 });
 });
 addEventListener("keyup", e => { keyState[e.key.toLowerCase()] = false; });
+/* Ctrl+W is reserved by the browser and cannot be intercepted by a page.
+   A confirmation prompt is the most any site is allowed to do. */
+addEventListener("beforeunload", e => {
+  if(Match.on && !Match.paused && Match.state === "fight"){
+    e.preventDefault(); e.returnValue = "";
+  }
+});
 function pollKeyboard(){
   if(Pose.running && Pose.cal) return;          /* tracking owns the stick */
   Input.block  = !!keyState["shift"];
-  Input.guard = keyState["shift"] ? 2 : 0;
-  Input.crouch = !!keyState["c"];
+  Input.guard  = keyState["shift"] ? 2 : 0;
+  Input.crouch = !!keyState["s"] || !!keyState["c"];
+  Input.moveX  = (keyState["d"] ? 1 : 0) - (keyState["a"] ? 1 : 0);
   Input.lean   = (keyState["w"] ? 1 : 0) - (keyState["x"] ? 1 : 0);
-  Input.strafe = (keyState["e"] ? 1 : 0) - (keyState["q"] ? 1 : 0);
+  Input.strafe = 0;
 }
 
 addEventListener("keydown", e => {
@@ -1481,6 +1624,7 @@ function fistFront(f, s, prog){
   return f.x + f.facing * (travel + FIST_R);
 }
 function fistInside(f, d, s, prog){
+  if(d.invuln > 0) return false;              /* dashed clear of it */
   const y = (s.aimY != null ? s.aimY : (ZONE_Y[s.zone] || .6)) + f.y;                      /* rides with the attacker */
   if(y > d.y + BODY_TOP || y < d.y + BODY_LOW) return false;   /* and must reach them */
   if(d.crouching && s.zone === "HEAD") return false;      /* sails overhead */
@@ -1623,7 +1767,8 @@ function applyHit(attacker, defender, ev){
   const guardLvl = defender.blocking ? (defender.guard === 1 ? 1 : 2) : 0;
   let blockF = guardLvl === 2 ? .2 : guardLvl === 1 ? .45 : 1;
   if(defender.armor > 0){ blockF *= .45; defender.armor -= 1; }
-  const powF = .8 + (attacker.power / 100) * .45;
+  const boostF = (attacker === PL && (Match.boost || 0) > 0) ? 1.5 : 1;
+  const powF = (.8 + (attacker.power / 100) * .45) * boostF;
   let dmg = DMG_BASE * speedF * zoneF * powF * defF * blockF * stF;
   dmg = clamp(Math.round(dmg), 1, 26);
 
@@ -1830,7 +1975,7 @@ function matchTick(dt){
     /* your position in frame IS your position in the arena */
     PL.x = lerp(PL.x, Input.posX, clamp(dt * 10, 0, 1));
   }else{
-    const drive = Input.lean * .7 + Input.strafe * .5;
+    const drive = (Input.moveX || 0) * 1.5 + Input.lean * .5;
     PL.x = clamp(PL.x + drive * PL.speed * dt, ARENA.left, ARENA.right);
   }
 
@@ -1841,6 +1986,24 @@ function matchTick(dt){
       if(PL.grab){ smashGround(PL, OP); return; }
       if(PL.st < 6){ logHit("NO STAMINA", ""); return; }
       tryAttack(PL, OP, ev);
+    }
+    if(ev.type === "DODGE"){
+      /* Q dashes the way you are already moving. Crouching turns it into
+         a hop straight up instead, and either way you are briefly
+         untouchable. */
+      if(PL.dodgeCd > 0) return;
+      PL.dodgeCd = .7;
+      PL.invuln = .3;
+      if(Input.crouch){
+        PL.vy = Math.max(PL.vy, 3.0); PL.grounded = false;
+        callout("AIR DODGE", .4);
+      }else{
+        const dir = Input.moveX || (Input.strafe || 0) || -PL.facing;
+        PL.kbx += dir * 2.3;
+        callout(dir < 0 ? "DASH LEFT" : "DASH RIGHT", .4);
+      }
+      shake(.3);
+      return;
     }
     if(ev.type === "JUMP"){
       if(PL.grounded){
@@ -1906,6 +2069,8 @@ function matchTick(dt){
       }
     }else ft.kbx = 0;
     ft.stunLock = Math.max(0, (ft.stunLock || 0) - dt);
+    ft.invuln = Math.max(0, (ft.invuln || 0) - dt);
+    ft.dodgeCd = Math.max(0, (ft.dodgeCd || 0) - dt);
     ft.st = Math.min(100, ft.st + dt * 16);
     ft.stun = Math.max(0, ft.stun - dt);
     ft.animT = Math.max(0, ft.animT - dt);
@@ -1916,6 +2081,7 @@ function matchTick(dt){
     ft.walk += dt * (8 + Math.abs(ft.vx) * 12);
   });
 
+  Match.boost = Math.max(0, (Match.boost || 0) - dt);
   Match.comboT -= dt;
   if(Match.comboT <= 0) Match.combo = 0;
   Match.timer -= dt;
@@ -1931,6 +2097,22 @@ function matchTick(dt){
   paintFightHud();
 }
 
+function paintHotbar(){
+  const el = $("#hotbar"); if(!el) return;
+  const kb = P.inputMode === "keyboard";
+  el.style.display = kb ? "flex" : "none";     /* camera play has no hotkeys */
+  if(!kb) return;
+  const now = performance.now();
+  el.innerHTML = (P.hotbar || []).map((id, i) => {
+    const key = (P.keybinds || [])[i] || String(i + 1);
+    if(!id) return '<div class="slot empty"><span class="k">' + key.toUpperCase() + "</span></div>";
+    const a = abilityById(id);
+    const left = Math.max(0, ((Cool[id] || 0) - now) / 1000);
+    return '<div class="slot"><span class="k">' + key.toUpperCase() + '</span>' +
+           '<span class="n">' + a.name + "</span>" +
+           (left > 0 ? '<span class="cd">' + Math.ceil(left) + "</span>" : "") + "</div>";
+  }).join("");
+}
 function paintFightHud(){
   $("#hpP").style.width = (PL.hp / PL.maxHp * 100) + "%";
   $("#hpO").style.width = (OP.hp / OP.maxHp * 100) + "%";
@@ -1953,6 +2135,7 @@ function paintFightHud(){
   cb.classList.toggle("show", Match.combo >= 2);
   $("#comboN").textContent = "x" + Match.combo;
   $("#comboRate").textContent = Match.combo >= 8 ? "SAVAGE" : Match.combo >= 5 ? "PERFECT" : "COMBO";
+  paintHotbar();
   const tb = $("#trainBadge");
   if(tb) tb.style.display = Match.training ? "inline-flex" : "none";
   $("#pipAct").textContent = Pose.running ? Pose.action : "NO CAMERA";
@@ -2481,9 +2664,13 @@ function drawCharacter(c, rig, cx, groundY, unit, facing, opts){
   /* eyes look where the fighter faces */
   if(id !== "RIVET" && id !== "TALLY" && !opts.koT){
     c.fillStyle = "#000";
+    /* the eyes look wherever you are aiming */
+    const ex = opts.eye ? clamp(opts.eye[0], -1, 1) : facing;
+    const ey = opts.eye ? clamp(opts.eye[1], -1, 1) : 0;
     [.18,.52].forEach(o => {
       c.beginPath();
-      c.arc(hd[0] + facing*hr*o, hd[1] + hr*.16, hr*.11, 0, 7); c.fill();
+      c.arc(hd[0] + hr * (o * facing * .55 + ex * .42),
+            hd[1] + hr * (.16 + ey * .30), hr*.11, 0, 7); c.fill();
     });
   }
 
@@ -2583,6 +2770,13 @@ function drawArena(t){
   });
   const live = (Pose.running && Pose.cal && !PL.ko && !PL.win) ? liveRig() : null;
   const pRig = live || animRig(PL, t);
+  let eyeAim = null;
+  if(!live && Mouse.inside){
+    const rc = $("#arena").getBoundingClientRect();
+    const hx = px, hy = groundY - PL.y * unit - unit * 2.45;
+    eyeAim = [ (Mouse.x - rc.left - hx) / (unit * 1.2),
+               (Mouse.y - rc.top - hy) / (unit * 1.2) ];
+  }
   if(!live && Mouse.inside && !PL.ko && !PL.win && Screen.now === "fight"){
     const rect = $("#arena").getBoundingClientRect();
     const oy = groundY - PL.y * unit;
@@ -2591,7 +2785,7 @@ function drawArena(t){
     aimArm(pRig, "L", tx, ty); aimArm(pRig, "R", tx, ty);
   }
   drawCharacter(c, pRig, px, groundY - PL.y * unit, unit, PL.facing,
-    { id:PL.f.id, glow: PL.animT > .1, koT: PL.koT, air: PL.y > .05 });
+    { id:PL.f.id, glow: PL.animT > .1, koT: PL.koT, air: PL.y > .05, eye: eyeAim });
   const oRig = (Match.online && OP.netRig && !OP.ko) ? OP.netRig : animRig(OP, t);
   drawCharacter(c, oRig, ox, groundY - OP.y * unit, unit, OP.facing,
     { id:OP.f.id, glow: OP.animT > .1, koT: OP.koT, air: OP.y > .05 });
@@ -2679,7 +2873,7 @@ function drawOverlay(cv){
    7. SCREENS
    ============================================================ */
 const Screen = { now:"title" };
-const SCREEN_IDS = ["title","setup","select","fight","result","online","shop","profile","account"];
+const SCREEN_IDS = ["title","setup","select","fight","result","online","shop","profile","account","abilities"];
 function go(id){
   const el = $("#s-" + id);
   if(!el) return;                      /* an unknown hash must not blank the app */
@@ -2690,6 +2884,7 @@ function go(id){
   if(id === "shop") paintShop();
   if(id === "profile") paintProfile();
   if(id === "account") paintAccount();
+  if(id === "abilities") paintAbilities();
   if(id === "title") paintTitle();
   if(id !== "fight") Match.on = false;
   location.hash = id;
@@ -2729,6 +2924,15 @@ $("#btnPauseMirror").addEventListener("click", toggleMirror);
 $("#pipBox").addEventListener("click", toggleMirror);
 /* Keyboard mode was a one-way door: choosing it at the gate stuck, with
    nothing anywhere to switch back. The top-bar pill now toggles it. */
+/* In keyboard mode the camera is off, so the pane in the corner is just
+   a dead grey box — hide it. */
+function paintCamVisibility(){
+  const kb = P.inputMode === "keyboard";
+  const pip = $("#pipBox");
+  if(pip) pip.style.display = kb ? "none" : "";
+  const cam = $("#tCam");
+  if(cam) cam.style.display = kb ? "none" : "";
+}
 function paintMode(){
   const el = $("#tMode"); if(!el) return;
   const kb = P.inputMode === "keyboard";
@@ -2743,6 +2947,7 @@ function toggleInputMode(){
     else toast("Camera mode. Your movements drive the fighter.");
   }else{
     P.inputMode = "keyboard"; save(); paintMode();
+    stopCamera(); paintCamVisibility();
     toast("Keyboard mode. Mouse aims, click punches, WASD moves.");
   }
 }
@@ -2855,6 +3060,67 @@ const SHOP = [
   ["Emotes", [["CHALK LINE","Taunt",750],["SHOULDER ROLL","Taunt",600],["TAPE UP","Round start",650]]]
 ];
 let shopCat = 0;
+let bindSlot = -1;
+function paintAbilities(){
+  $("#abBal").textContent = P.coins.toLocaleString();
+  $("#abHotbar").innerHTML = (P.hotbar || []).map((id, i) => {
+    const key = (P.keybinds || [])[i] || String(i + 1);
+    const a = id ? abilityById(id) : null;
+    return '<button class="slot' + (a ? "" : " empty") + '" data-slot="' + i +
+      '" style="width:64px;height:64px;cursor:pointer"><span class="k">' +
+      (bindSlot === i ? "..." : key.toUpperCase()) + "</span>" +
+      (a ? '<span class="n">' + a.name + "</span>" : "") + "</button>";
+  }).join("");
+  $$("#abHotbar .slot").forEach(el => el.addEventListener("click", () => {
+    bindSlot = bindSlot === +el.dataset.slot ? -1 : +el.dataset.slot;
+    toast(bindSlot >= 0 ? "Press the key you want for this slot." : "Rebinding cancelled.");
+    paintAbilities();
+  }));
+
+  $("#abGrid").innerHTML = ABILITIES.map(a => {
+    const owned = ownsAbility(a.id);
+    const inSlot = (P.hotbar || []).indexOf(a.id);
+    const btn = owned
+      ? '<button class="mini" data-equip="' + a.id + '">' + (inSlot >= 0 ? "SLOT " + (inSlot+1) : "EQUIP") + "</button>"
+      : '<button class="mini" data-buyab="' + a.id + '">BUY</button>';
+    return '<div class="item' + (owned ? " own" : "") + '"><div class="sw">' + a.name.charAt(0) +
+      '</div><div class="mt"><b>' + a.name + "</b><span>" + a.desc +
+      " · " + a.cd + "s cooldown</span></div><div class=\"by\">" +
+      '<span class="price">' + (owned ? "OWNED" : a.cost.toLocaleString()) + "</span>" + btn + "</div></div>";
+  }).join("");
+  $$("#abGrid [data-buyab]").forEach(b => b.addEventListener("click", () => {
+    const a = abilityById(b.dataset.buyab);
+    if(P.coins < a.cost){ toast("Not enough coins — you need " + (a.cost - P.coins).toLocaleString() + " more."); return; }
+    P.coins -= a.cost;
+    P.abilities = (P.abilities || []).concat(a.id);
+    const free = (P.hotbar || []).indexOf(null);
+    if(free >= 0) P.hotbar[free] = a.id;       /* drop it straight into a slot */
+    save(); paintAbilities();
+    toast(a.name + " bought" + (free >= 0 ? " and put in slot " + (free+1) + "." : "."));
+  }));
+  $$("#abGrid [data-equip]").forEach(b => b.addEventListener("click", () => {
+    const id = b.dataset.equip;
+    const at = P.hotbar.indexOf(id);
+    if(at >= 0){ P.hotbar[at] = null; }
+    else {
+      const free = P.hotbar.indexOf(null);
+      if(free < 0){ toast("Every slot is full — clear one first."); return; }
+      P.hotbar[free] = id;
+    }
+    save(); paintAbilities();
+  }));
+}
+/* rebinding: the next key you press claims the slot */
+addEventListener("keydown", e => {
+  if(bindSlot < 0 || Screen.now !== "abilities") return;
+  const k = e.key.toLowerCase();
+  if(k === "escape"){ bindSlot = -1; paintAbilities(); return; }
+  if(k.length !== 1) return;
+  e.preventDefault();
+  P.keybinds[bindSlot] = k;
+  toast("Slot " + (bindSlot + 1) + " is now " + k.toUpperCase() + ".");
+  bindSlot = -1; save(); paintAbilities();
+});
 function paintShop(){
   $("#shopCats").innerHTML = SHOP.map((c,i) =>
     '<button class="cat' + (i === shopCat ? " on" : "") + '" data-c="' + i + '">' + c[0] + "</button>").join("");
@@ -2964,6 +3230,7 @@ function frame(now){
   poseTick(dt);
   pollKeyboard();
   paintMode();
+  paintCamVisibility();
   refreshGates();
   if(toastT > 0){ toastT -= dt; if(toastT <= 0) $("#toast").classList.remove("show"); }
   if(Screen.now === "setup"){ drawOverlay($("#overlay")); paintSetup(); }
@@ -3072,6 +3339,7 @@ $("#tabIn").addEventListener("click", () => setAuthMode("login"));
 $("#tabUp").addEventListener("click", () => setAuthMode("register"));
 $("#tAcct").addEventListener("click", () => go("account"));
 $("#tMode").addEventListener("click", toggleInputMode);
+$("#btnModeSide").addEventListener("click", toggleInputMode);
 
 $("#btnAuth").addEventListener("click", async () => {
   if(Cloud.busy) return;
