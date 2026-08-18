@@ -932,13 +932,40 @@ function stopCamera(){
 }
 
 /* --- smoothing: exponential filter per landmark --- */
-function smooth(lms){
-  if(!Pose.sm){ Pose.sm = lms.map(p => ({x:p.x, y:p.y, v:p.visibility ?? 1})); return Pose.sm; }
-  const a = 0.72;   /* follow the body faster; velocity is smoothed separately */
+/* One Euro filter. A fixed smoothing factor forces a choice between a
+   shaky fighter and a laggy one. This adapts instead: heavy smoothing
+   while you hold still (kills jitter) and light smoothing as soon as you
+   move fast (keeps punches responsive). */
+const OE = { minCutoff:1.05, beta:.055, dCutoff:1.0 };
+function oeAlpha(cutoff, dt){
+  const tau = 1 / (2 * Math.PI * cutoff);
+  return 1 / (1 + tau / dt);
+}
+function oeStep(st, x, dt){
+  if(st.prev === null){ st.prev = x; st.dPrev = 0; return x; }
+  const dx = (x - st.prev) / dt;
+  const dHat = st.dPrev + oeAlpha(OE.dCutoff, dt) * (dx - st.dPrev);
+  const a = oeAlpha(OE.minCutoff + OE.beta * Math.abs(dHat), dt);
+  const out = st.prev + a * (x - st.prev);
+  st.prev = out; st.dPrev = dHat;
+  return out;
+}
+function smooth(lms, dt){
+  dt = Math.min(Math.max(dt || 1/30, 1/120), .1);
+  if(!Pose.sm){
+    Pose.sm = lms.map(p => ({ x:p.x, y:p.y, v:p.visibility ?? 1,
+                              fx:{prev:null,dPrev:0}, fy:{prev:null,dPrev:0} }));
+    return Pose.sm;
+  }
   for(let i = 0; i < lms.length; i++){
     const s = Pose.sm[i], p = lms[i];
-    s.x = lerp(s.x, p.x, a); s.y = lerp(s.y, p.y, a);
-    s.v = lerp(s.v, p.visibility ?? 1, .3);
+    const vis = p.visibility ?? 1;
+    s.v += (vis - s.v) * .25;
+    /* a landmark the model cannot actually see is a guess, and guesses
+       jump; hold the last good position rather than chasing the noise */
+    if(vis < .35) continue;
+    s.x = oeStep(s.fx, p.x, dt);
+    s.y = oeStep(s.fy, p.y, dt);
   }
   return Pose.sm;
 }
@@ -1073,12 +1100,31 @@ let lastVideoTime = -1, fpsAcc = 0, fpsN = 0;
 /* Body every frame; fingers and face are cosmetic/zone hints and can lag.
    These back off automatically when the body rate drops. */
 let HAND_EVERY = 3, FACE_EVERY = 8;
+let resDropped = false;
 function tuneBudget(){
   const f = Pose.realFps;
   if(!f) return;
-  if(f < 18){ HAND_EVERY = 6; FACE_EVERY = 16; }
+  /* the body model is what drives the fighter; fingers and face are
+     detail. Drop the detail first, and only then the picture size. */
+  Pose.faceAuto = f >= 30;
+  Pose.handAuto = f >= 15;
+  if(f < 18){ HAND_EVERY = 6; FACE_EVERY = 20; }
   else if(f < 28){ HAND_EVERY = 4; FACE_EVERY = 12; }
   else { HAND_EVERY = 3; FACE_EVERY = 8; }
+
+  if(!resDropped && f < 22 && Pose.stream){
+    resDropped = true;
+    const tr = Pose.stream.getVideoTracks()[0];
+    if(tr && tr.applyConstraints){
+      tr.applyConstraints({ width:{ideal:320}, height:{ideal:240}, frameRate:{ideal:60} })
+        .then(() => {
+          const st = tr.getSettings ? tr.getSettings() : {};
+          $("#oCam").textContent = (st.width||320) + "×" + (st.height||240) +
+            (st.frameRate ? " @" + Math.round(st.frameRate) : "");
+          toast("Lowered camera resolution to lift the tracking rate.");
+        }).catch(() => {});
+    }
+  }
 }
 function poseTick(dt){
   if(!Pose.running || !Pose.landmarker) return;
@@ -1100,7 +1146,7 @@ function poseTick(dt){
   }
   if(res && res.landmarks && res.landmarks.length){
     Pose.raw = res.landmarks[0];
-    smooth(Pose.raw);
+    smooth(Pose.raw, dt);
     if(!Pose.cal){
       /* keep trying until the player is actually in frame, rather than
          calibrating once on a timer and locking them out if they were late */
@@ -1120,10 +1166,10 @@ function poseTick(dt){
 
   /* stagger the heavier models so they never starve pose tracking */
   Pose.tick++;
-  if(Pose.handsOn && Pose.hander && Pose.tick % HAND_EVERY === 0){
+  if(Pose.handsOn && Pose.handAuto !== false && Pose.hander && Pose.tick % HAND_EVERY === 0){
     try{ readHands(Pose.hander.detectForVideo(v, t0 + 1)); }catch(e){}
   }
-  if(Pose.faceOn && Pose.facer && Pose.tick % FACE_EVERY === 0){
+  if(Pose.faceOn && Pose.faceAuto !== false && Pose.facer && Pose.tick % FACE_EVERY === 0){
     try{ readFace(Pose.facer.detectForVideo(v, t0 + 2)); }catch(e){}
   }
 }
@@ -1824,9 +1870,24 @@ const BL = {};
   BL[a + ">" + b] = Math.hypot(REST[a][0] - REST[b][0], REST[a][1] - REST[b][1]);
 });
 
+let rigPrev = null;
+function smoothRig(r){
+  if(!rigPrev){ rigPrev = {}; for(const k in r) rigPrev[k] = r[k].slice(); return r; }
+  const a = .55;
+  for(const k in r){
+    if(!rigPrev[k]){ rigPrev[k] = r[k].slice(); continue; }
+    rigPrev[k][0] += (r[k][0] - rigPrev[k][0]) * a;
+    rigPrev[k][1] += (r[k][1] - rigPrev[k][1]) * a;
+    r[k][0] = rigPrev[k][0]; r[k][1] = rigPrev[k][1];
+  }
+  return r;
+}
 function liveRig(){
   const s = Pose.sm, cal = Pose.cal;
   if(!s || !cal) return null;
+  /* built once per tracked frame: it is read by the arena, the preview
+     and the netcode, and re-smoothing it per caller would over-damp it */
+  if(Pose.rigFrame === Pose.tick && Pose.rigCache) return Pose.rigCache;
   const mir = Pose.mirror ? -1 : 1;
   const shM = mid(s[L.SHL], s[L.SHR]), hpM = mid(s[L.HIPL], s[L.HIPR]);
   const r = { hip:[0,0] };
@@ -1849,7 +1910,9 @@ function liveRig(){
   /* plant the feet: crouching should drop the hips, not lift the shoes */
   const dy = 1.42 - Math.max(r.anL[1], r.anR[1]);
   for(const k in r) r[k][1] += dy;
-  return r;
+  Pose.rigCache = smoothRig(r);
+  Pose.rigFrame = Pose.tick;
+  return Pose.rigCache;
 }
 function animRig(ft, t){
   const r = {}; for(const k in REST) r[k] = REST[k].slice();
