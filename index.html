@@ -634,6 +634,7 @@ kbd{font-family:var(--mono); font-size:11px; border:1px solid var(--ink); paddin
             <div class="kv"><span>Wins</span><b id="pfW">0</b></div>
             <div class="kv"><span>Losses</span><b id="pfL">0</b></div>
             <div class="kv"><span>Win streak</span><b id="pfS">0</b></div>
+            <div class="kv"><span>Login streak</span><b id="pfLS">0</b></div>
             <div class="kv"><span>Best combo</span><b id="pfC">0</b></div>
             <div class="kv"><span>Fastest punch</span><b id="pfP">&mdash;</b></div>
             <button class="btn quiet" id="btnReset" style="justify-self:start; margin-top:6px">Reset progress</button>
@@ -710,7 +711,8 @@ const DEFAULT_SAVE = {
   /* everything below is device-local too, so a reload picks up exactly
      where you left off — including your body calibration */
   mirror:true, sensitivity:.62, punchSens:.62, cal:null, name:"you",
-  matches:0, totalDmg:0, onlineWins:0
+  matches:0, totalDmg:0, onlineWins:0,
+  loginStreak:0, lastLogin:"", bestLoginStreak:0
 };
 function xpForLevel(lv){ return 300 + (lv-1)*250; }
 let P = loadSave();
@@ -1269,7 +1271,8 @@ function newRound(){
   PL.hp = PL.maxHp; OP.hp = OP.maxHp;
   PL.st = 100; OP.st = 100; PL.x = .32; OP.x = .68;
   PL.stun = 0; OP.stun = 0;
-  [PL,OP].forEach(f => { f.ko = false; f.koT = 0; f.win = false; f.prevX = f.x; f.vx = 0; });
+  [PL,OP].forEach(f => { f.ko = false; f.koT = 0; f.win = false; f.prevX = f.x; f.vx = 0;
+                         f.strike = null; });
   Match.timer = 60; Match.state = "countdown"; Match.stateT = 3; Match.combo = 0;
 }
 function paintRounds(){
@@ -1290,23 +1293,72 @@ function callout(txt, dur){
   Match.calloutT = dur;
 }
 
-/* --- the core rule: range + speed + zone --- */
+/* ============================================================
+   COLLISION
+   A punch is no longer "were you close enough when you swung". It
+   spawns a strike: a fist volume that travels out along the arm over
+   the punch animation. Damage lands on the single frame the fist
+   crosses into the opponent's body, so one punch deals at most one
+   hit — and a fist that starts already inside them (pressed right up
+   against the opponent) is dead on arrival and does nothing.
+   ============================================================ */
+const BODY_HW    = .055;   /* half-width of a fighter's hurtbox        */
+const BODY_TOP   = 1.00;
+const BODY_LOW   = .15;
+const FIST_R     = .018;
+const FIST_START = .045;   /* how far in front of the chest it starts  */
+const ZONE_Y     = { HEAD:.88, BODY:.60, LOW:.30 };
+
+function punchCurve(prog){ return Math.sin(clamp(prog, 0, 1) * Math.PI * .5); }
+function fistFront(f, s, prog){
+  const reach = f.reach + (s.heavy ? .02 : 0);
+  const travel = FIST_START + punchCurve(prog) * (reach - FIST_START);
+  return f.x + f.facing * (travel + FIST_R);
+}
+function fistInside(f, d, s, prog){
+  const y = ZONE_Y[s.zone] || .6;
+  if(y > BODY_TOP || y < BODY_LOW) return false;
+  if(d.crouching && s.zone === "HEAD") return false;      /* sails overhead */
+  const front = fistFront(f, s, prog);
+  return f.facing > 0 ? front >= d.x - BODY_HW
+                      : front <= d.x + BODY_HW;
+}
+
 function tryAttack(attacker, defender, ev){
-  const gap = Math.abs(attacker.x - defender.x);
-  const reach = attacker.reach + (ev.heavy ? .02 : 0);
   attacker.anim = ev.side === "L" ? "PUNCH_L" : "PUNCH_R";
   attacker.animT = .22; attacker.atkSide = ev.side;
   attacker.st = Math.max(0, attacker.st - (ev.heavy ? 14 : 8));
-
-  if(gap > reach){
+  const strike = { side:ev.side, zone:ev.zone, speed:ev.speed, heavy:!!ev.heavy,
+                   t:0, dur:.22, hit:false, dead:false };
+  if(fistInside(attacker, defender, strike, 0)){
+    strike.dead = true;                                   /* no room to swing */
     if(!attacker.isBot){
-      Match.whiffs++;
       Match.combo = 0;
-      logHit("OUT OF RANGE &mdash; gap " + gap.toFixed(2), "step in");
-      $("#rangeLab").textContent = "TOO FAR";
+      logHit("TOO CLOSE &mdash; no room to swing", "step back");
     }
-    return;
   }
+  attacker.strike = strike;
+}
+
+function stepStrike(attacker, defender, dt){
+  const s = attacker.strike;
+  if(!s) return;
+  s.t += dt;
+  const prog = s.t / s.dur;
+  if(!s.dead && !s.hit && fistInside(attacker, defender, s, prog)){
+    s.hit = true;
+    applyHit(attacker, defender, s);
+  }
+  if(prog >= 1){
+    if(!s.hit && !s.dead && !attacker.isBot){
+      Match.whiffs++; Match.combo = 0;
+      logHit("MISSED &mdash; gap " + Math.abs(attacker.x - defender.x).toFixed(2), "step in");
+    }
+    attacker.strike = null;
+  }
+}
+
+function applyHit(attacker, defender, ev){
   const speedF = clamp(ev.speed / 3.0, .4, 2.0);
   const zoneF = ZONES[ev.zone] || 1;
   const stF = attacker.st < 15 ? .5 : 1;
@@ -1321,7 +1373,6 @@ function tryAttack(attacker, defender, ev){
   attacker.sp = Math.min(100, attacker.sp + dmg * .7);
   defender.sp = Math.min(100, defender.sp + dmg * .4);
 
-  /* online: the attacker computes the hit, the defender applies it */
   if(Match.online && attacker === PL) netSend({ t:"h", d:dmg, z:ev.zone, s:ev.speed });
 
   const crit = ev.zone === "HEAD" && speedF > 1.5 && ev.speed > 3.4;
@@ -1351,6 +1402,7 @@ function endRound(playerWon){
     PL.hp = PL.maxHp; OP.hp = OP.maxHp;
     PL.st = 100; OP.st = 100;
     PL.x = .32; OP.x = .68; PL.ko = OP.ko = false; PL.win = OP.win = false;
+    PL.strike = OP.strike = null;
     Match.combo = 0; Match.timer = 60;
     callout(playerWon ? "DOWN — RESET" : "YOU WENT DOWN — RESET", 1.2);
     logHit(playerWon ? "Opponent reset" : "You were knocked down", "");
@@ -1439,7 +1491,10 @@ function botMove(gap, dt, skill){
 }
 
 /* fighters are solid: keep them apart and keep the player on the left */
-const MIN_GAP = .145;
+/* Resting separation sits just outside the jam threshold, so simply
+   walking in never locks you out of attacking — being too close to
+   swing is a state you can recover from, not a trap. */
+const MIN_GAP = .135;
 function separate(){
   if(OP.x - PL.x < MIN_GAP){
     if(Match.online){
@@ -1480,6 +1535,7 @@ function matchTick(dt){
 
   /* player movement from lean/strafe */
   PL.blocking = Input.block;
+  PL.crouching = Input.crouch;
   if(Input.posActive){
     /* your position in frame IS your position in the arena */
     PL.x = lerp(PL.x, Input.posX, clamp(dt * 10, 0, 1));
@@ -1504,6 +1560,8 @@ function matchTick(dt){
 
   if(Match.online) applyRemote(); else botThink(dt);
   separate();
+  stepStrike(PL, OP, dt);
+  stepStrike(OP, PL, dt);
 
   [PL, OP].forEach(ft => {
     ft.st = Math.min(100, ft.st + dt * 16);
@@ -1540,12 +1598,14 @@ function paintFightHud(){
   $("#spO").style.width = OP.sp + "%";
   $("#fTimer").textContent = Math.max(0, Math.ceil(Match.timer));
   const gap = Math.abs(PL.x - OP.x);
-  const inR = gap <= PL.reach;
+  const jammed = gap <= FIST_START + FIST_R + BODY_HW;      /* no room to swing */
+  const inR = !jammed && gap <= PL.reach + BODY_HW + FIST_R;
   const span = ARENA.right - ARENA.left;
   $("#rangeZone").style.left = "0%";
   $("#rangeZone").style.width = (PL.reach / span * 100) + "%";
   $("#rangeYou").style.left = clamp(gap / span * 100, 0, 100) + "%";
-  $("#rangeLab").textContent = inR ? "IN RANGE" : "TOO FAR — STEP IN";
+  $("#rangeLab").textContent = jammed ? "TOO CLOSE — STEP BACK"
+                              : inR ? "IN RANGE" : "TOO FAR — STEP IN";
   $("#rangeBar").style.background = inR ? "var(--yellow-pale)" : "var(--wash)";
   const cb = $("#comboBox");
   cb.classList.toggle("show", Match.combo >= 2);
@@ -2340,7 +2400,8 @@ function paintTitle(){
   $("#titleStats").innerHTML = [
     "LEVEL " + P.lv, P.coins.toLocaleString() + " COINS",
     P.wins + "W / " + P.losses + "L", "STREAK " + P.streak,
-    P.owned.length + "/" + FIGHTERS.length + " FIGHTERS"
+    P.owned.length + "/" + FIGHTERS.length + " FIGHTERS",
+    "DAY " + (P.loginStreak || 1) + " STREAK"
   ].map(s => '<span class="pill">' + s + "</span>").join("");
 }
 function paintRoster(){
@@ -2428,6 +2489,8 @@ function paintProfile(){
   $("#pfCoins").textContent = P.coins.toLocaleString();
   $("#pfW").textContent = P.wins; $("#pfL").textContent = P.losses;
   $("#pfS").textContent = P.streak; $("#pfC").textContent = "x" + P.bestCombo;
+  $("#pfLS").textContent = (P.loginStreak || 0) + " day" + (P.loginStreak === 1 ? "" : "s") +
+    ((P.bestLoginStreak || 0) > (P.loginStreak || 0) ? " (best " + P.bestLoginStreak + ")" : "");
   $("#pfP").textContent = P.fastest ? P.fastest.toFixed(1) + " m/s" : "—";
   $("#pfRp").textContent = P.rp;
   let cur = 0;
@@ -2513,11 +2576,33 @@ function frame(now){
   requestAnimationFrame(frame);
 }
 
+/* ---- daily login streak: come back tomorrow, keep the run alive ---- */
+function dayKey(offsetMs){
+  const d = new Date(Date.now() - (offsetMs || 0));
+  return d.getFullYear() + "-" + (d.getMonth() + 1) + "-" + d.getDate();
+}
+function checkLoginStreak(){
+  const today = dayKey(0);
+  if(P.lastLogin === today) return null;              /* already counted today */
+  P.loginStreak = (P.lastLogin === dayKey(864e5)) ? (P.loginStreak || 0) + 1 : 1;
+  P.bestLoginStreak = Math.max(P.bestLoginStreak || 0, P.loginStreak);
+  P.lastLogin = today;
+  const reward = 100 + Math.min(P.loginStreak, 7) * 50;   /* tops out at day 7 */
+  P.coins += reward;
+  save();
+  return { streak:P.loginStreak, reward };
+}
+
 /* restore device-local state */
 Pose.mirror = P.mirror !== false;
 if(P.cal) Pose.cal = P.cal;
 applyMirror(); paintCal();
+const dailyBonus = checkLoginStreak();
 paintTopbar(); paintTitle();
+if(dailyBonus){
+  setTimeout(() => toast("Day " + dailyBonus.streak + " login streak — +" +
+    dailyBonus.reward + " coins. Come back tomorrow to keep it going."), 900);
+}
 const initial = location.hash.slice(1);
 if(initial && initial !== "fight" && SCREEN_IDS.indexOf(initial) >= 0) go(initial);
 
