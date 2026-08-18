@@ -34,6 +34,19 @@ body{
   -webkit-font-smoothing:antialiased; overflow:hidden;
 }
 button{font-family:inherit}
+/* Dark mode keeps the same four colours and only swaps which one is the
+   ground: black paper, white ink, grey for small type, yellow unchanged. */
+:root[data-theme="dark"]{
+  --paper:#0B0B0B;
+  --ink:#FFFFFF;
+  --grey:#9A9A9A;
+  --grey-soft:#6E6E6E;
+  --rule:#333333;
+  --wash:#171717;
+  --yellow:#FFC800;
+  --yellow-pale:#3A2E00;
+  color-scheme: dark;
+}
 :focus-visible{outline:3px solid var(--ink); outline-offset:2px}
 
 .app{height:100dvh; display:flex; flex-direction:column}
@@ -90,6 +103,42 @@ h1,h2,h3{margin:0; letter-spacing:-.01em}
 .meter i{display:block; height:100%; background:var(--yellow); transition:width .18s linear}
 .meter.sm{height:7px; border-width:1px}
 .meter.ink i{background:var(--ink)}
+
+/* ---------- lobby ---------- */
+.lob-head{display:flex; align-items:flex-start; gap:18px; flex-wrap:wrap}
+.lob-head>div:first-child{flex:1; min-width:220px}
+.lob-code{text-align:right}
+.banner{
+  border:2px solid var(--ink); padding:12px 14px;
+  display:flex; align-items:baseline; gap:14px; flex-wrap:wrap;
+}
+.banner em{
+  font-style:normal; font-size:clamp(17px,2.6vw,27px); font-weight:800;
+  text-transform:uppercase; letter-spacing:.01em; line-height:1;
+}
+.banner span{
+  font-family:var(--mono); font-size:11px; letter-spacing:.08em;
+  text-transform:uppercase; color:var(--grey);
+}
+.banner.hot{background:var(--yellow)}
+.banner.hot span{color:var(--ink)}
+.seats{display:grid}
+.seat{display:flex; align-items:center; gap:10px; padding:9px 0; border-top:1px solid var(--rule)}
+.seat:first-child{border-top:0}
+.seat-i{font-family:var(--mono); font-size:10px; color:var(--grey-soft); width:18px}
+.seat-n{flex:1; font-weight:800; text-transform:uppercase; letter-spacing:.02em; font-size:13px}
+.seat-f{font-family:var(--mono); font-size:10px; color:var(--grey); letter-spacing:.08em}
+.seat.me .seat-n{text-decoration:underline; text-decoration-thickness:2px; text-underline-offset:3px}
+.live{display:grid; gap:11px}
+.live-row{display:grid; gap:4px}
+.live-top{
+  display:flex; justify-content:space-between; gap:8px;
+  font-family:var(--mono); font-size:11px; text-transform:uppercase; letter-spacing:.06em;
+}
+.live-idle{
+  font-family:var(--mono); font-size:11px; color:var(--grey);
+  text-transform:uppercase; letter-spacing:.08em;
+}
 
 /* ---------- 1 TITLE ---------- */
 .title{align-items:center; justify-content:center; text-align:center; padding:24px; gap:6px}
@@ -377,8 +426,8 @@ kbd{font-family:var(--mono); font-size:11px; border:1px solid var(--ink); paddin
     <g stroke="#000" stroke-width="3" stroke-linejoin="round">
       <path d="M92,31 Q100,21 108,31 L108,43 L92,43 Z" fill="#FFC800"/>
       <rect x="94" y="43" width="12" height="52" fill="#FFC800"/>
-      <path d="M85,122 L115,122 L112,200 L100,242 L88,200 Z" fill="#FFFFFF"/>
-      <path d="M100,122 L115,122 L112,200 L100,242 Z" fill="#D8D8D8" stroke="none"/>
+      <path d="M85,122 L115,122 L112,200 L100,242 L88,200 Z" fill="var(--paper)"/>
+      <path d="M100,122 L115,122 L112,200 L100,242 Z" fill="var(--rule)" stroke="none"/>
       <path d="M58,116 L72,94 L128,94 L142,116 L124,124 L114,110 L86,110 L76,124 Z" fill="#FFC800"/>
       <path d="M100,100 L107,108 L100,116 L93,108 Z" fill="#000000"/>
     </g>
@@ -419,6 +468,7 @@ kbd{font-family:var(--mono); font-size:11px; border:1px solid var(--ink); paddin
           <h3>Settings</h3>
           <button class="btn" id="btnSetup">Camera setup</button>
           <button class="btn" id="btnModeSide">Input mode</button>
+          <button class="btn" id="btnTheme">Dark mode</button>
           <button class="btn" id="btnHowto">How to play</button>
         </aside>
       <div class="title" style="display:flex; flex-direction:column; flex:1">
@@ -623,9 +673,9 @@ kbd{font-family:var(--mono); font-size:11px; border:1px solid var(--ink); paddin
       <div class="pad">
         <h2 class="h-lg">Play a friend</h2>
         <p class="muted" style="max-width:64ch; margin:0">
-          Both of you open this page. One creates a room and reads out the code, the other joins with it.
-          Your two browsers connect <b>directly to each other</b> — the match never touches a server.
-          Each of you uses your own camera.
+          One player creates a room and reads out the code; everyone else joins with it.
+          Two or more can be in a lobby — you fight one at a time, winner stays on.
+          Browsers connect <b>directly to each other</b> — the match never touches a server.
         </p>
         <div class="two">
           <div class="card">
@@ -648,13 +698,52 @@ kbd{font-family:var(--mono); font-size:11px; border:1px solid var(--ink); paddin
         <div class="card">
           <h3>Connection</h3>
           <div class="kv"><span>Status</span><b id="netStatus">Not connected</b></div>
-          <div class="kv"><span>Opponent</span><b id="netPeer">—</b></div>
+          <div class="kv"><span>Players</span><b id="netPeer">—</b></div>
           <div class="kv"><span>Ping</span><b id="netPing">—</b></div>
-          <p class="note">One round, first knockout wins. Damage still needs range, speed and a good hit zone — and your friend sees your real body move if your camera is on.</p>
-          <button class="btn primary big" id="btnNetFight" disabled>Start the fight</button>
+          <p class="note">Best of three rounds. Damage still needs range, speed and a good hit zone — and your friends see your real body move if your camera is on.</p>
+          <button class="btn primary big" id="btnNetFight" disabled>Open the lobby</button>
           <button class="btn quiet" id="btnNetLeave">Disconnect</button>
         </div>
         <button class="btn quiet" data-go="title" style="justify-self:start">Back</button>
+      </div>
+    </section>
+
+    <!-- ===================== LOBBY ===================== -->
+    <section class="screen" id="s-lobby">
+      <div class="pad">
+        <div class="lob-head">
+          <div>
+            <h2 class="h-lg">Lobby</h2>
+            <p class="muted" style="max-width:60ch; margin:0">
+              Winner stays in the ring. The loser goes to the back of the line, so
+              everyone gets another turn. Read the code out to add more players.
+            </p>
+          </div>
+          <div class="lob-code">
+            <p class="lbl" style="margin:0 0 4px">Room code</p>
+            <div class="codeout" id="lobCode">&middot;&middot;&middot;&middot;</div>
+          </div>
+        </div>
+
+        <div class="banner" id="lobBanner">
+          <em id="lobBannerT">Waiting for players</em>
+          <span id="lobBannerS"></span>
+        </div>
+
+        <div class="two">
+          <div class="card">
+            <h3>Players <span class="pill" id="lobCount">1</span></h3>
+            <div class="seats" id="lobList"></div>
+          </div>
+          <div class="card">
+            <h3>Now fighting</h3>
+            <div class="live" id="lobLive"></div>
+            <div class="kv"><span>Ping to host</span><b id="lobPing">&mdash;</b></div>
+            <button class="btn primary big" id="btnLobStart" disabled>Start the fight</button>
+            <button class="btn quiet" id="btnLobLeave">Leave lobby</button>
+          </div>
+        </div>
+        <button class="btn quiet" data-go="online" style="justify-self:start">Back to pairing</button>
       </div>
     </section>
 
@@ -742,6 +831,7 @@ kbd{font-family:var(--mono); font-size:11px; border:1px solid var(--ink); paddin
             <div class="kv"><span>Login streak</span><b id="pfLS">0</b></div>
             <div class="kv"><span>Best combo</span><b id="pfC">0</b></div>
             <div class="kv"><span>Fastest punch</span><b id="pfP">&mdash;</b></div>
+            <div class="kv"><span>Theme</span><b id="pfTheme">LIGHT</b></div>
             <div class="kv"><span>Free purchases</span><b id="pfInf">ON</b></div>
             <button class="btn quiet" id="btnInf" style="justify-self:start">Toggle free purchases</button>
             <button class="btn quiet" id="btnReset" style="justify-self:start; margin-top:6px">Reset progress</button>
@@ -801,6 +891,30 @@ kbd{font-family:var(--mono); font-size:11px; border:1px solid var(--ink); paddin
 
 <script type="module">
 "use strict";
+/* Every canvas colour goes through here so the arena follows the theme
+   instead of staying white while the page around it turns black. */
+const PAL = { paper:"#FFFFFF", ink:"#000000", grey:"#767676",
+              greySoft:"#A0A0A0", rule:"#D8D8D8", wash:"#F5F5F5",
+              yellow:"#FFC800", yellowPale:"#FFF4CC" };
+const PAL_DARK = { paper:"#0B0B0B", ink:"#FFFFFF", grey:"#9A9A9A",
+                   greySoft:"#6E6E6E", rule:"#333333", wash:"#171717",
+                   yellow:"#FFC800", yellowPale:"#3A2E00" };
+function applyTheme(){
+  const dark = P.theme === "dark" ||
+    (P.theme !== "light" && matchMedia("(prefers-color-scheme: dark)").matches);
+  document.documentElement.setAttribute("data-theme", dark ? "dark" : "light");
+  Object.assign(PAL, dark ? PAL_DARK : {
+    paper:"#FFFFFF", ink:"#000000", grey:"#767676", greySoft:"#A0A0A0",
+    rule:"#D8D8D8", wash:"#F5F5F5", yellow:"#FFC800", yellowPale:"#FFF4CC" });
+  const el = document.querySelector("#pfTheme");
+  if(el) el.textContent = dark ? "DARK" : "LIGHT";
+}
+function toggleTheme(){
+  const dark = document.documentElement.getAttribute("data-theme") === "dark";
+  P.theme = dark ? "light" : "dark";
+  save(); applyTheme();
+  toast(P.theme === "dark" ? "Dark mode on." : "Light mode on.");
+}
 const $ = s => document.querySelector(s);
 const $$ = s => Array.from(document.querySelectorAll(s));
 const clamp = (v,a,b) => v < a ? a : v > b ? b : v;
@@ -811,6 +925,7 @@ const lerp = (a,b,t) => a + (b-a)*t;
       this is the only module that touches persistence)
    ============================================================ */
 const SAVE_KEY = "motionbrawler.save.v1";
+const ECON = 2;                 /* bump to re-run the economy reset */
 const DEFAULT_SAVE = {
   lv:1, xp:0, coins:500, wins:0, losses:0, streak:0, rp:1000,
   bestCombo:0, fastest:0, fighter:"RIVET", diff:1,
@@ -821,7 +936,7 @@ const DEFAULT_SAVE = {
   matches:0, totalDmg:0, onlineWins:0,
   loginStreak:0, lastLogin:"", bestLoginStreak:0,
   inputMode:"auto",
-  infCoins:true,
+  infCoins:false, econ:ECON, theme:"auto",
   abilities:[], hotbar:[null,null,null,null,null,null,null,null,null],
   keybinds:["1","2","3","4","5","6","7","8","9"]
 };
@@ -840,8 +955,22 @@ function loadSave(){
   try{
     const raw = localStorage.getItem(SAVE_KEY);
     if(!raw) return {...DEFAULT_SAVE};
-    return Object.assign({}, DEFAULT_SAVE, JSON.parse(raw));
+    return Object.assign({}, DEFAULT_SAVE, migrate(JSON.parse(raw)));
   }catch(e){ return {...DEFAULT_SAVE}; }
+}
+/* Coins were free while the shop was being built, so every save carries an
+   infinite balance. Switching the economy on has to clear that once, or
+   prices mean nothing for anyone who played the earlier build. Runs on the
+   record as it was stored: merging the defaults in first would supply the
+   version marker the check is looking for and the reset would never fire. */
+function migrate(s){
+  if(!s || typeof s !== "object") return s;
+  if(s.econ !== ECON){
+    s.coins = DEFAULT_SAVE.coins;
+    s.infCoins = false;
+    s.econ = ECON;
+  }
+  return s;
 }
 function save(){
   try{ localStorage.setItem(SAVE_KEY, JSON.stringify(P)); }catch(e){}
@@ -851,6 +980,8 @@ function save(){
 /* never lose a session to a closed tab or a crash */
 addEventListener("visibilitychange", () => { if(document.hidden) save(); });
 addEventListener("pagehide", save);
+/* follow the system unless a choice has been made */
+matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => applyTheme());
 setInterval(save, 10000);
 function grant(xp, coins, rp){
   P.xp += xp; P.coins += coins; P.rp = Math.max(0, P.rp + rp);
@@ -1606,7 +1737,7 @@ function startMatch(online, training){
   dmgFx.length = 0; hitFx.length = 0;
   $("#pName").textContent = me.id;
   $("#oName").textContent = foe.id;
-  $("#oTag").textContent = online ? "online" : (["dummy","easy bot","medium bot","hard bot"][P.diff] || "bot");
+  $("#oTag").textContent = online ? Net.oppName : (["dummy","easy bot","medium bot","hard bot"][P.diff] || "bot");
   $("#pauseBox").classList.remove("on");
   paintRounds();
   logHit("Step in close, then punch fast", "");
@@ -2011,16 +2142,26 @@ function matchTick(dt){
   PL.blocking = Input.block;
   PL.guard = Input.guard || 0;
   PL.crouching = Input.crouch;
-  if(Input.posActive){
-    /* your position in frame IS your position in the arena */
-    PL.x = lerp(PL.x, Input.posX, clamp(dt * 10, 0, 1));
-  }else{
-    const drive = (Input.moveX || 0) * 1.5 + Input.lean * .5;
-    PL.x = clamp(PL.x + drive * PL.speed * dt, ARENA.left, ARENA.right);
+  /* Swept off your feet: you cannot move or act until you are back up. */
+  const downed = PL.stunLock > 0;
+  if(!downed){
+    if(Input.posActive){
+      /* your position in frame IS your position in the arena */
+      PL.x = lerp(PL.x, Input.posX, clamp(dt * 10, 0, 1));
+    }else{
+      const drive = (Input.moveX || 0) * 1.5 + Input.lean * .5;
+      PL.x = clamp(PL.x + drive * PL.speed * dt, ARENA.left, ARENA.right);
+    }
   }
 
-  if(PL.stunLock > 0){ drainEvents(); return; }      /* you are down too */
+  /* Being downed drops your inputs, and nothing else. Returning out of the
+     whole tick here was a deadlock: stunLock is counted back down in the
+     physics block further below, so the timer meant to free you never ran.
+     Everything stopped for good — the bot included — which is why it looked
+     like the bot froze at random. It was always right after a grab or a
+     slide tackle landed on you. */
   drainEvents().forEach(ev => {
+    if(downed) return;
     if(Match.state !== "fight") return;
     if(ev.type === "PUNCH"){
       if(PL.grab){ smashGround(PL, OP); return; }
@@ -2195,10 +2336,30 @@ function togglePause(){
    5b. PAIRING — direct peer-to-peer, no game server.
        Each side owns its own fighter and reports what it did.
    ============================================================ */
+/* One player hosts and everyone else connects to them, so the host is the
+   switchboard: it owns the roster, decides who is in the ring, and forwards
+   gameplay between the two fighters even when it is not one of them. */
 const Net = {
-  peer:null, conn:null, on:false, host:false, code:"",
-  remote:null, remoteFighter:"KESTREL", lastSend:0, ping:0, pingSent:0
+  peer:null, on:false, host:false, code:"", me:"",
+  conns:{},              /* host only: every joiner, keyed by peer id */
+  hostConn:null,         /* client only: the one link to the host */
+  seats:[],              /* roster in join order */
+  ring:[],               /* the two ids fighting right now */
+  queue:[],              /* ids waiting their turn, front first */
+  oppId:null, oppName:"friend", matchId:0, next:null, pingTimer:0,
+  remote:null, remoteFighter:"KESTREL", lastSend:0, ping:0, pingSent:0,
+  live:null, liveHp:{}, liveSent:0
 };
+/* names come off the wire from other players, so they are never trusted */
+const esc = t => String(t == null ? "" : t).replace(/[&<>"']/g,
+  c => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#39;" })[c]);
+const seatOf   = id => Net.seats.find(x => x.id === id);
+const seatName = id => { const x = seatOf(id); return x ? x.name : "someone"; };
+function ringFoe(id){
+  if(Net.ring.length !== 2) return null;
+  return Net.ring[0] === id ? Net.ring[1] : Net.ring[1] === id ? Net.ring[0] : null;
+}
+const inRing = id => Net.ring.indexOf(id) >= 0;
 const CODE_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 /* Camera and keyboard players fight very differently, so they queue in
    separate pools: the input mode is baked into the room id, which means a
@@ -2217,39 +2378,108 @@ function netStatus(s, cls){
   $("#netStatus").textContent = s;
   if(cls) toast(s);
 }
-function wireConn(conn){
-  Net.conn = conn;
+const sendRaw = (conn, m) => { if(conn && conn.open){ try{ conn.send(m); }catch(e){} } };
+
+/* host side: a joiner arrived */
+function hostAccept(conn){
+  conn.on("open", () => {
+    Net.conns[conn.peer] = conn;
+    sendRaw(conn, { t:"welcome", you:conn.peer, code:Net.code });
+  });
+  conn.on("data", m => onNetData(m, conn.peer));
+  conn.on("close", () => dropPlayer(conn.peer));
+  conn.on("error", () => dropPlayer(conn.peer));
+}
+/* client side: our one link to the host */
+function clientWire(conn){
+  Net.hostConn = conn;
   conn.on("open", () => {
     Net.on = true;
     netStatus("Connected");
-    $("#netPeer").textContent = conn.peer.replace(roomId(""), "") || "friend";
-    $("#btnNetFight").disabled = !Net.host;
-    if(!Net.host) $("#joinStatus").textContent = "Connected — waiting for the host to start.";
-    else $("#hostStatus").textContent = "Player joined. Start when you are both ready.";
-    netSend({ t:"hello", f:P.fighter });
-    setInterval(() => { if(Net.on){ Net.pingSent = performance.now(); netSend({ t:"ping" }); } }, 2000);
+    $("#joinStatus").textContent = "In the lobby.";
+    $("#btnNetFight").disabled = false;
+    sendRaw(conn, { t:"join", name:P.name, f:P.fighter });
+    startPings();
+    go("lobby");
   });
-  conn.on("data", onNetData);
+  conn.on("data", m => onNetData(m, "host"));
   conn.on("close", () => {
-    Net.on = false; netStatus("Opponent disconnected");
+    Net.on = false; netStatus("Host closed the lobby");
+    Net.seats = []; Net.ring = []; Net.queue = [];
     $("#btnNetFight").disabled = true;
-    if(Match.on && Match.online) endOnline(true, "Opponent left");
+    if(Match.on && Match.online) endOnline(true, "Host left");
+    else paintLobby();
   });
   conn.on("error", e => netStatus("Connection error: " + e.type));
 }
-function netSend(m){
-  if(Net.conn && Net.conn.open){ try{ Net.conn.send(m); }catch(e){} }
+function startPings(){
+  if(Net.pingTimer) clearInterval(Net.pingTimer);
+  Net.pingTimer = setInterval(() => {
+    if(!Net.on || Net.host) return;
+    Net.pingSent = performance.now();
+    sendRaw(Net.hostConn, { t:"ping" });
+  }, 2000);
 }
-function onNetData(m){
-  if(m.t === "ping"){ netSend({ t:"pong" }); return; }
+function broadcast(m){ Object.keys(Net.conns).forEach(id => sendRaw(Net.conns[id], m)); }
+/* returns false when the target is the host itself, which acts on its own copy */
+function sendSeat(id, m){
+  if(id === Net.me) return false;
+  sendRaw(Net.conns[id], m); return true;
+}
+/* Gameplay always travels through the host. A fighter just says "send this
+   to my opponent" and the host works out where that is. */
+function netSend(m){
+  if(!Net.on) return;
+  if(Net.host) route(Net.me, m);
+  else sendRaw(Net.hostConn, m);
+}
+function route(fromId, m){
+  if(m.t === "s") noteLive(fromId, m);
+  const foe = ringFoe(fromId);
+  if(!foe) return;
+  if(foe === Net.me) applyGame(m);         /* the host is the other fighter */
+  else sendRaw(Net.conns[foe], m);
+}
+function onNetData(m, from){
+  /* --- link keepalive --- */
+  if(m.t === "ping"){ sendRaw(Net.conns[from], { t:"pong" }); return; }
   if(m.t === "pong"){
     Net.ping = Math.round(performance.now() - Net.pingSent);
-    $("#netPing").textContent = Net.ping + " ms"; return;
+    setTxt("#netPing", Net.ping + " ms");
+    setTxt("#lobPing", Net.ping + " ms");
+    return;
   }
-  if(m.t === "hello"){ Net.remoteFighter = m.f || "KESTREL"; return; }
-  if(m.t === "start"){ Net.remoteFighter = m.f || Net.remoteFighter; startMatch(true); return; }
+
+  /* --- lobby traffic --- */
+  if(m.t === "welcome"){ Net.me = m.you; Net.code = m.code || Net.code; return; }
+  if(m.t === "join"){
+    if(Net.host) seatPlayer(from, m.name, m.f);
+    return;
+  }
+  if(m.t === "me"){                          /* they switched fighter in the lobby */
+    if(Net.host){ const x = seatOf(from); if(x){ x.fighter = m.f; pushLobby(); } }
+    return;
+  }
+  if(m.t === "lobby"){ applyLobby(m); return; }
+  if(m.t === "begin"){ localBegin(m); return; }
+  if(m.t === "outcome"){ showOutcome(m); return; }
+  if(m.t === "live"){ Net.live = m; if(Screen.now === "lobby") paintLobby(); return; }
+  if(m.t === "res"){                         /* host only: first report settles it */
+    if(!Net.host || m.mid !== Net.matchId) return;
+    settle(m.won ? from : ringFoe(from), m.won ? ringFoe(from) : from, m.why);
+    return;
+  }
+
+  /* --- gameplay: the host is the switchboard, a client is the target --- */
+  if(m.t === "s" || m.t === "h" || m.t === "ko"){
+    if(Net.host) route(from, m);
+    else applyGame(m);
+  }
+}
+function applyGame(m){
   if(m.t === "s"){ Net.remote = m; return; }
-  if(m.t === "h" && Match.on){
+  if(!Match.on) return;
+  if(m.t === "h"){
     /* the opponent landed one on us — they computed it, we apply it */
     PL.hp = Math.max(0, PL.hp - m.d);
     PL.stun = .2;
@@ -2260,7 +2490,201 @@ function onNetData(m){
     if(PL.hp <= 0){ netSend({ t:"ko" }); endOnline(false); }
     return;
   }
-  if(m.t === "ko" && Match.on){ endOnline(true); return; }
+  if(m.t === "ko"){ endOnline(true); return; }
+}
+
+/* ============================================================
+   5c. LOBBY — a roster and a winner-stays queue. The host is the
+       only authority; everyone else paints what it sends.
+   ============================================================ */
+function seatPlayer(id, name, fighter){
+  const x = seatOf(id);
+  const clean = String(name || "player").slice(0, 16) || "player";
+  if(!x) Net.seats.push({ id, name:clean, fighter:fighter || "RIVET", wins:0 });
+  else { x.name = clean; x.fighter = fighter || x.fighter; }
+  netStatus(Net.seats.length + " in the lobby");
+  setTxt("#hostStatus", Net.seats.length < 2
+    ? "Waiting for someone to join…"
+    : Net.seats.length + " players in. Start when everyone is ready.");
+  pushLobby();
+}
+function dropPlayer(id){
+  delete Net.conns[id];
+  const gone = seatOf(id);
+  if(!gone) return;
+  Net.seats = Net.seats.filter(x => x.id !== id);
+  Net.queue = Net.queue.filter(q => q !== id);
+  if(inRing(id)){
+    /* a fighter walked out mid-match: whoever is still standing takes it */
+    const survivor = ringFoe(id);
+    if(survivor){ settle(survivor, null, gone.name + " left"); return; }
+    Net.ring = [];
+  }
+  if(Net.next && Net.next.indexOf(id) >= 0){
+    /* they were due up next, so pull the following challenger forward */
+    const keep = Net.next.find(x => x !== id);
+    Net.next = nextPair(keep);
+  }
+  pushLobby();
+}
+function hostStart(){
+  if(!Net.host) return;
+  if(Net.seats.length < 2){ toast("You need at least two players in the lobby."); return; }
+  Net.queue = Net.seats.map(x => x.id);
+  Net.next = [Net.queue.shift(), Net.queue.shift()];
+  beginRing();
+}
+/* pull the next challenger up against whoever is holding the ring */
+function nextPair(champ){
+  const c = Net.queue.shift() || null;
+  return (champ && c) ? [champ, c] : null;
+}
+function beginRing(){
+  if(!Net.host || !Net.next) return;
+  Net.ring = Net.next; Net.next = null;
+  Net.matchId++; Net.liveHp = {}; Net.live = null;
+  Net.ring.forEach(id => {
+    const foe = ringFoe(id), f = seatOf(foe);
+    const msg = { t:"begin", mid:Net.matchId, foe,
+                  f:(f && f.fighter) || "KESTREL", name:(f && f.name) || "friend" };
+    if(!sendSeat(id, msg)) localBegin(msg);
+  });
+  pushLobby();
+}
+/* Winner stays on, loser goes to the back of the line, next challenger steps
+   up. With only two in the lobby that comes out as a straight rematch.
+   Clearing the ring here is also the guard: both fighters report the end
+   independently, and the second report finds an empty ring and does nothing. */
+function settle(winner, loser, why){
+  if(!Net.host || !winner || !Net.ring.length) return;
+  const w = seatOf(winner); if(w) w.wins++;
+  if(loser && seatOf(loser)) Net.queue.push(loser);
+  Net.ring = [];
+  Net.next = nextPair(winner);
+  const note = { t:"outcome", w:seatName(winner),
+                 l:loser ? seatName(loser) : "", why:why || "" };
+  broadcast(note);
+  showOutcome(note);
+  pushLobby();
+  if(Net.next) setTimeout(beginRing, 4200);      /* let the result screen land */
+}
+function reportResult(won, why){
+  if(!Net.on) return;
+  if(!Net.host){
+    sendRaw(Net.hostConn, { t:"res", mid:Net.matchId, won:!!won, why:why || "" });
+    return;
+  }
+  if(!inRing(Net.me)) return;
+  const foe = ringFoe(Net.me);
+  settle(won ? Net.me : foe, won ? foe : Net.me, why);
+}
+function localBegin(m){
+  Net.matchId = m.mid;
+  Net.oppId = m.foe; Net.remoteFighter = m.f || "KESTREL";
+  Net.oppName = m.name || "friend";
+  Net.remote = null;
+  startMatch(true);
+}
+function showOutcome(m){
+  if(!m.w) return;
+  toast(m.why ? m.w + " wins — " + m.why : m.w + " beat " + m.l);
+  /* Whoever is not in the next fight drifts back to the lobby to watch.
+     The champion is held on the result screen instead, so they go straight
+     into their next match rather than flashing through the lobby. */
+  setTimeout(() => {
+    const due = inRing(Net.me) || (Net.next && Net.next.indexOf(Net.me) >= 0);
+    if(Net.on && Screen.now === "result" && !due) go("lobby");
+  }, 3400);
+}
+function lobbyState(){
+  return { t:"lobby", code:Net.code, ring:Net.ring.slice(), queue:Net.queue.slice(),
+           next:Net.next ? Net.next.slice() : null,
+           seats:Net.seats.map(x => ({ id:x.id, name:x.name, fighter:x.fighter, wins:x.wins })) };
+}
+function pushLobby(){ broadcast(lobbyState()); paintLobby(); }
+function applyLobby(m){
+  Net.seats = m.seats || []; Net.ring = m.ring || []; Net.queue = m.queue || [];
+  Net.next = m.next || null;
+  if(m.code) Net.code = m.code;
+  paintLobby();
+}
+/* the host sees both fighters' state, so waiting players get a live scoreboard */
+function noteLive(fromId, m){
+  Net.liveHp[fromId] = m.hf == null ? 1 : m.hf;
+  const now = performance.now();
+  if(now - Net.liveSent < 220) return;
+  Net.liveSent = now;
+  const pack = { t:"live", a:Net.liveHp[Net.ring[0]], b:Net.liveHp[Net.ring[1]] };
+  broadcast(pack); Net.live = pack;
+  if(Screen.now === "lobby") paintLobby();
+}
+function paintLobby(){
+  const list = $("#lobList"); if(!list) return;
+  const upNext = id => !!Net.next && Net.next.indexOf(id) >= 0;
+  setTxt("#lobCode", Net.code || "····");
+  setTxt("#lobCount", String(Net.seats.length));
+  setTxt("#netPeer", Net.seats.length ? Net.seats.length + " in lobby" : "—");
+  setTxt("#lobPing", Net.host ? "you are the host" : (Net.ping ? Net.ping + " ms" : "—"));
+
+  list.innerHTML = Net.seats.length ? Net.seats.map((x, i) => {
+    const q = Net.queue.indexOf(x.id);
+    const tag = inRing(x.id) ? '<span class="pill on">FIGHTING</span>'
+              : upNext(x.id) ? '<span class="pill live">UP NEXT</span>'
+              : q >= 0       ? '<span class="pill">#' + (q + 1) + ' IN LINE</span>'
+              :                '<span class="pill">READY</span>';
+    return '<div class="seat' + (x.id === Net.me ? " me" : "") + '">' +
+      '<span class="seat-i">' + String(i + 1).padStart(2, "0") + '</span>' +
+      '<span class="seat-n">' + esc(x.name) + (x.id === Net.me ? " (you)" : "") + '</span>' +
+      '<span class="seat-f">' + esc(x.fighter) + '</span>' +
+      '<span class="seat-f">' + (x.wins || 0) + 'W</span>' + tag + '</div>';
+  }).join("") : '<p class="note">Nobody here yet — read the code out to a friend.</p>';
+
+  const fighting = Net.ring.length === 2;
+  const shown = fighting ? Net.ring : (Net.next || []);
+  const pair = shown.length === 2
+    ? esc(seatName(shown[0])) + " vs " + esc(seatName(shown[1])) : "";
+  let title, sub, hot = false;
+  if(fighting && inRing(Net.me)){
+    title = "You're in the ring"; sub = pair; hot = true;
+  }else if(fighting){
+    const q = Net.queue.indexOf(Net.me);
+    title = "Waiting for a fight";
+    sub = (upNext(Net.me) ? "You're up next · " : q >= 0 ? "You're #" + (q + 1) + " in line · " : "") +
+          "now fighting " + pair;
+  }else if(upNext(Net.me)){
+    title = "You're up next"; sub = pair + " — starting now"; hot = true;
+  }else if(Net.next){
+    title = "Waiting for a fight";
+    const q = Net.queue.indexOf(Net.me);
+    sub = (q >= 0 ? "You're #" + (q + 1) + " in line · " : "") + "next up " + pair;
+  }else if(Net.seats.length < 2){
+    title = "Waiting for players"; sub = "Read the room code out to a friend";
+  }else{
+    title = Net.host ? "Ready when you are" : "Waiting for the host to start";
+    sub = Net.seats.length + " in the lobby";
+  }
+  setTxt("#lobBannerT", title);
+  setTxt("#lobBannerS", sub);
+  const b = $("#lobBanner");
+  if(b) b.classList.toggle("hot", hot);
+
+  const live = $("#lobLive");
+  if(live) live.innerHTML = fighting
+    ? Net.ring.map((id, i) => {
+        const f = Net.live ? Net.live[i ? "b" : "a"] : null;
+        const pct = Math.round(clamp(f == null ? 1 : f, 0, 1) * 100);
+        return '<div class="live-row"><div class="live-top"><span>' + esc(seatName(id)) +
+               '</span><span>' + pct + '%</span></div>' +
+               '<div class="meter"><i style="width:' + pct + '%"></i></div></div>';
+      }).join("")
+    : '<p class="live-idle">Nobody in the ring yet</p>';
+
+  const sb = $("#btnLobStart");
+  if(sb){
+    sb.style.display = Net.host ? "" : "none";
+    sb.disabled = !(Net.seats.length >= 2 && !fighting);
+    sb.textContent = fighting ? "Fight in progress" : "Start the fight";
+  }
 }
 function netTick(now){
   if(!Net.on || !Match.on || !Match.online) return;
@@ -2270,7 +2694,7 @@ function netTick(now){
   const packed = live ? Object.keys(live).map(k => [Math.round(live[k][0]*100)/100,
                                                     Math.round(live[k][1]*100)/100]) : null;
   netSend({ t:"s", x:PL.x, a:PL.anim, at:PL.animT, hp:PL.hp, st:PL.st,
-            ko:PL.ko, r:packed });
+            hf:Math.round(PL.hp / PL.maxHp * 1000) / 1000, ko:PL.ko, r:packed });
 }
 /* REST is declared further down, so resolve the key order on first use */
 let _rigKeys = null;
@@ -2306,6 +2730,7 @@ function endOnline(won, why){
   $("#resChips").innerHTML = ["ONLINE", "TOP COMBO x" + Match.best, "HITS " + Match.hits,
     Net.ping ? "PING " + Net.ping + "MS" : "P2P"]
     .map(c => '<span class="pill live">' + c + "</span>").join("");
+  reportResult(won, why);
   go("result");
 }
 
@@ -2316,13 +2741,17 @@ $("#btnHost").addEventListener("click", async () => {
   for(let i = 0; i < 4; i++) code += CODE_CHARS[Math.floor(Math.random() * CODE_CHARS.length)];
   try{
     Net.peer = await getPeer(roomId(code));
-    Net.host = true; Net.code = code;
+    Net.host = true; Net.code = code; Net.me = roomId(code);
     Net.peer.on("open", () => {
+      Net.on = true;
       $("#hostBox").style.display = "grid";
       $("#roomCode").textContent = code;
+      $("#btnNetFight").disabled = false;
       netStatus("Room open — waiting");
+      seatPlayer(Net.me, P.name, P.fighter);      /* the host takes seat one */
+      go("lobby");
     });
-    Net.peer.on("connection", wireConn);
+    Net.peer.on("connection", hostAccept);
     Net.peer.on("error", e => {
       netStatus("Could not open a room: " + e.type);
       $("#btnHost").disabled = false;
@@ -2339,7 +2768,7 @@ $("#btnJoin").addEventListener("click", async () => {
   try{
     Net.peer = await getPeer(undefined);
     Net.host = false; Net.code = code;
-    Net.peer.on("open", () => wireConn(Net.peer.connect(roomId(code), { reliable:false })));
+    Net.peer.on("open", () => clientWire(Net.peer.connect(roomId(code), { reliable:false })));
     Net.peer.on("error", e => {
       $("#joinStatus").textContent = e.type === "peer-unavailable"
         ? "No " + modeLabel(inputMode()) + " room with that code. " +
@@ -2348,18 +2777,25 @@ $("#btnJoin").addEventListener("click", async () => {
     });
   }catch(e){ $("#joinStatus").textContent = "Pairing unavailable: " + e.message; }
 });
-$("#btnNetFight").addEventListener("click", () => {
-  netSend({ t:"start", f:P.fighter });
-  startMatch(true);
-});
-$("#btnNetLeave").addEventListener("click", () => {
-  if(Net.conn) Net.conn.close();
-  if(Net.peer) Net.peer.destroy();
-  Net.on = false; Net.peer = null; Net.conn = null;
-  $("#btnHost").disabled = false; $("#hostBox").style.display = "none";
+$("#btnNetFight").addEventListener("click", () => go("lobby"));
+$("#btnLobStart").addEventListener("click", hostStart);
+$("#btnLobLeave").addEventListener("click", () => { netLeave(); go("online"); });
+$("#btnNetLeave").addEventListener("click", netLeave);
+function netLeave(){
+  Object.keys(Net.conns).forEach(id => { try{ Net.conns[id].close(); }catch(e){} });
+  if(Net.hostConn){ try{ Net.hostConn.close(); }catch(e){} }
+  if(Net.peer){ try{ Net.peer.destroy(); }catch(e){} }
+  if(Net.pingTimer){ clearInterval(Net.pingTimer); Net.pingTimer = 0; }
+  Object.assign(Net, { peer:null, on:false, host:false, code:"", me:"",
+    conns:{}, hostConn:null, seats:[], ring:[], queue:[], oppId:null,
+    matchId:0, next:null, remote:null, live:null, liveHp:{}, ping:0 });
+  $("#btnHost").disabled = false;
+  $("#hostBox").style.display = "none";
   $("#btnNetFight").disabled = true;
+  setTxt("#netPeer", "—"); setTxt("#netPing", "—");
   netStatus("Not connected");
-});
+  paintLobby();
+}
 
 /* ============================================================
    6. RENDER
@@ -2397,6 +2833,49 @@ const BL = {};
  ["hpR","knR"],["knR","anR"]].forEach(([a,b]) => {
   BL[a + ">" + b] = Math.hypot(REST[a][0] - REST[b][0], REST[a][1] - REST[b][1]);
 });
+
+/* Walk the skeleton outward and force every bone back to its rest length,
+   keeping the direction it was posed in. Flight poses can then be written as
+   "point the shin here" without arithmetic to stop the limb stretching. */
+const CHAIN = [["hip","neck"],["neck","nose"],["neck","shL"],["neck","shR"],
+  ["shL","elL"],["elL","wrL"],["shR","elR"],["elR","wrR"],
+  ["hip","hpL"],["hip","hpR"],["hpL","knL"],["knL","anL"],
+  ["hpR","knR"],["knR","anR"]];
+function fixBones(r){
+  CHAIN.forEach(([a,b]) => {
+    const len = BL[a + ">" + b];
+    let dx = r[b][0] - r[a][0], dy = r[b][1] - r[a][1];
+    let m = Math.hypot(dx, dy);
+    if(m < 1e-5){ dx = REST[b][0] - REST[a][0]; dy = REST[b][1] - REST[a][1]; m = len; }
+    r[b] = [ r[a][0] + dx / m * len, r[a][1] + dy / m * len ];
+  });
+  return r;
+}
+/* mirror which side reads as near and which as far, for a rolling body */
+function swapLR(r){
+  const o = {}; for(const k in r) o[k] = r[k];
+  [["shL","shR"],["elL","elR"],["wrL","wrR"],
+   ["hpL","hpR"],["knL","knR"],["anL","anR"]].forEach(([a,b]) => {
+    const t = o[a]; o[a] = o[b]; o[b] = t;
+  });
+  return o;
+}
+/* Two-bone IK. bend -1 puts the joint forward for a right-facing fighter,
+   +1 puts it behind. Over-reach clamps to just under full extension so a
+   limb never snaps through itself. */
+function ik(r, root, mid, end, tx, ty, bend){
+  const L1 = BL[root + ">" + mid], L2 = BL[mid + ">" + end];
+  const rx = r[root][0], ry = r[root][1];
+  const raw = Math.hypot(tx - rx, ty - ry) || 1e-6;
+  const ux = (tx - rx) / raw, uy = (ty - ry) / raw;
+  const d = clamp(raw, Math.abs(L1 - L2) + 1e-3, (L1 + L2) * .999);
+  const a = (L1*L1 - L2*L2 + d*d) / (2*d);
+  const h = Math.sqrt(Math.max(0, L1*L1 - a*a));
+  r[mid] = [rx + ux*a - uy*h*bend, ry + uy*a + ux*h*bend];
+  r[end] = [rx + ux*d, ry + uy*d];
+}
+const armTo = (r,s,tx,ty,bend) => ik(r, "sh"+s, "el"+s, "wr"+s, tx, ty, bend == null ? 1 : bend);
+const legTo = (r,s,tx,ty,bend) => ik(r, "hp"+s, "kn"+s, "an"+s, tx, ty, bend == null ? -1 : bend);
 
 let rigPrev = null;
 function smoothRig(r){
@@ -2508,7 +2987,7 @@ function animRig(ft, t){
 /* an outlined limb: black casing, then the fill inside it */
 function limb(c, A, B, w, fill, ol){
   c.lineCap = "round";
-  c.strokeStyle = "#000"; c.lineWidth = w + ol * 2;
+  c.strokeStyle = PAL.ink; c.lineWidth = w + ol * 2;
   c.beginPath(); c.moveTo(A[0], A[1]); c.lineTo(B[0], B[1]); c.stroke();
   c.strokeStyle = fill; c.lineWidth = w;
   c.beginPath(); c.moveTo(A[0], A[1]); c.lineTo(B[0], B[1]); c.stroke();
@@ -2516,21 +2995,35 @@ function limb(c, A, B, w, fill, ol){
 /* a boxing glove at the wrist */
 function drawGlove(c, wrist, unit, ol){
   c.beginPath(); c.arc(wrist[0], wrist[1], unit * .17, 0, 7);
-  c.fillStyle = "#FFC800"; c.fill();
-  c.lineWidth = ol * 2; c.strokeStyle = "#000"; c.stroke();
+  c.fillStyle = PAL.yellow; c.fill();
+  c.lineWidth = ol * 2; c.strokeStyle = PAL.ink; c.stroke();
 }
 function blob(c, at, r, fill, ol){
   c.beginPath(); c.arc(at[0], at[1], r, 0, 7);
   c.fillStyle = fill; c.fill();
-  c.lineWidth = ol * 2; c.strokeStyle = "#000"; c.stroke();
+  c.lineWidth = ol * 2; c.strokeStyle = PAL.ink; c.stroke();
 }
 
 function drawCharacter(c, rig, cx, groundY, unit, facing, opts){
   opts = opts || {};
   const ko = opts.koT || 0;
-  const P2 = j => [ cx + rig[j][0] * unit * facing, groundY + (rig[j][1] - 1.42) * unit ];
+  /* Flight needs a body angle, so joints turn about the hip before they are
+     planted. `squash` flattens the body across its own long axis, which is
+     how a roll reads in two dimensions. Both default to no change, so every
+     grounded pose projects exactly as it did before. */
+  const rot = opts.rot || 0;
+  let sq = opts.squash == null ? 1 : opts.squash;
+  if(sq < 0){ rig = swapLR(rig); sq = -sq; }   /* rolled past edge-on: swap near and far */
+  const cs = Math.cos(rot), sn = Math.sin(rot);
+  const P2 = j => {
+    const x = rig[j][0] * sq, y = rig[j][1];
+    return [ cx + (x * cs - y * sn) * unit * facing,
+             groundY + (x * sn + y * cs - 1.42) * unit ];
+  };
+  /* the screen-space turn, for parts drawn as upright shapes */
+  const lean = rot * facing;
   const ol = unit * .035;
-  const WH = "#FFF", GY = "#D8D8D8", YL = "#FFC800";
+  const WH = PAL.paper, GY = PAL.rule, YL = PAL.yellow;
   const id = opts.id || "RIVET";
 
   c.save();
@@ -2540,7 +3033,7 @@ function drawCharacter(c, rig, cx, groundY, unit, facing, opts){
   /* contact shadow */
   c.beginPath();
   c.ellipse(cx, groundY + unit * .04, unit * .52, unit * .085, 0, 0, 7);
-  c.fillStyle = "#D8D8D8"; c.fill();
+  c.fillStyle = PAL.rule; c.fill();
 
   if(opts.glow){                                /* attack flash behind the body */
     const g = new Path2D();
@@ -2554,12 +3047,18 @@ function drawCharacter(c, rig, cx, groundY, unit, facing, opts){
   limb(c, P2("knR"), P2("anR"), unit * .155, GY, ol);
   limb(c, P2("hpL"), P2("knL"), unit * .20, WH, ol);
   limb(c, P2("knL"), P2("anL"), unit * .165, WH, ol);
-  /* boots */
-  [["anR",GY],["anL",WH]].forEach(([j,f]) => {
-    const a = P2(j);
+  /* boots, aligned to the shin so they still read when the body is sideways */
+  [["anR","knR"],["anL","knL"]].forEach(([j,k]) => {
+    const a = P2(j), b = P2(k);
+    let dx = a[0] - b[0], dy = a[1] - b[1];
+    const m = Math.hypot(dx, dy) || 1; dx /= m; dy /= m;
+    c.save();
+    c.translate(a[0] + dx * unit * .02, a[1] + dy * unit * .02);
+    c.rotate(Math.atan2(dy, dx) - Math.PI / 2);
     c.beginPath();
-    c.ellipse(a[0] + facing * unit * .07, a[1] + unit * .02, unit * .17, unit * .10, 0, 0, 7);
-    c.fillStyle = "#000"; c.fill();
+    c.ellipse(facing * unit * .06, unit * .01, unit * .17, unit * .10, 0, 0, 7);
+    c.fillStyle = PAL.ink; c.fill();
+    c.restore();
   });
 
   /* torso */
@@ -2568,7 +3067,7 @@ function drawCharacter(c, rig, cx, groundY, unit, facing, opts){
   c.moveTo(sL[0], sL[1]); c.lineTo(sR[0], sR[1]);
   c.lineTo(hR[0], hR[1]); c.lineTo(hL[0], hL[1]); c.closePath();
   c.fillStyle = WH; c.fill();
-  c.lineWidth = ol * 2; c.strokeStyle = "#000"; c.lineJoin = "round"; c.stroke();
+  c.lineWidth = ol * 2; c.strokeStyle = PAL.ink; c.lineJoin = "round"; c.stroke();
   /* belt */
   c.beginPath();
   c.moveTo(hL[0], hL[1] - unit * .10); c.lineTo(hR[0], hR[1] - unit * .10);
@@ -2577,7 +3076,9 @@ function drawCharacter(c, rig, cx, groundY, unit, facing, opts){
 
   /* chest mark, per fighter */
   const mid2 = [(sL[0]+hL[0]+sR[0]+hR[0])/4, (sL[1]+hL[1]+sR[1]+hR[1])/4];
-  c.lineWidth = ol * 1.8; c.strokeStyle = "#000";
+  c.save();
+  if(lean){ c.translate(mid2[0], mid2[1]); c.rotate(lean); c.translate(-mid2[0], -mid2[1]); }
+  c.lineWidth = ol * 1.8; c.strokeStyle = PAL.ink;
   if(id === "MAYDAY"){
     c.strokeStyle = YL; c.lineWidth = ol * 2.6;
     c.beginPath();
@@ -2614,7 +3115,7 @@ function drawCharacter(c, rig, cx, groundY, unit, facing, opts){
   }else if(id === "BRINE"){                       /* apron bib */
     c.fillStyle = GY;
     c.fillRect(mid2[0] - unit*.13, mid2[1] - unit*.14, unit*.26, unit*.30);
-    c.lineWidth = ol*1.6; c.strokeStyle = "#000";
+    c.lineWidth = ol*1.6; c.strokeStyle = PAL.ink;
     c.strokeRect(mid2[0] - unit*.13, mid2[1] - unit*.14, unit*.26, unit*.30);
   }else if(id === "TALLY"){                       /* tally strokes */
     c.strokeStyle = YL; c.lineWidth = ol * 2;
@@ -2629,20 +3130,25 @@ function drawCharacter(c, rig, cx, groundY, unit, facing, opts){
   }else if(id === "GRIDDLE"){                     /* hot plate */
     c.fillStyle = YL;
     c.beginPath(); c.arc(mid2[0], mid2[1], unit*.11, 0, 7); c.fill();
-    c.lineWidth = ol*1.8; c.strokeStyle = "#000"; c.stroke();
+    c.lineWidth = ol*1.8; c.strokeStyle = PAL.ink; c.stroke();
   }
+
+  c.restore();
 
   /* back arm */
   limb(c, P2("shR"), P2("elR"), unit * .145, GY, ol);
   limb(c, P2("elR"), P2("wrR"), unit * .125, GY, ol);
   drawGlove(c, P2("wrR"), unit * .92, ol);
 
-  /* head */
+  /* head — headgear and eyes are upright shapes, so turn the canvas once
+     and every fighter's hat comes along for free */
   const hd = P2("nose"), hr = unit * .23;
+  c.save();
+  if(lean){ c.translate(hd[0], hd[1]); c.rotate(lean); c.translate(-hd[0], -hd[1]); }
   blob(c, hd, hr, WH, ol);
   if(id === "SLAB"){                              /* hard hat */
     c.beginPath(); c.arc(hd[0], hd[1] - hr*.16, hr*1.02, Math.PI, 0);
-    c.fillStyle = YL; c.fill(); c.lineWidth = ol*2; c.strokeStyle="#000"; c.stroke();
+    c.fillStyle = YL; c.fill(); c.lineWidth = ol*2; c.strokeStyle=PAL.ink; c.stroke();
     c.beginPath();
     c.moveTo(hd[0] - hr*1.28, hd[1] - hr*.16); c.lineTo(hd[0] + hr*1.28, hd[1] - hr*.16);
     c.lineWidth = ol*2.4; c.stroke();
@@ -2650,7 +3156,7 @@ function drawCharacter(c, rig, cx, groundY, unit, facing, opts){
     c.beginPath();
     c.moveTo(hd[0] - hr, hd[1] - hr*.34); c.lineTo(hd[0] + hr, hd[1] - hr*.34);
     c.strokeStyle = YL; c.lineWidth = hr*.42; c.stroke();
-    c.strokeStyle = "#000"; c.lineWidth = ol; c.stroke();
+    c.strokeStyle = PAL.ink; c.lineWidth = ol; c.stroke();
     c.beginPath();
     c.moveTo(hd[0] - facing*hr*.9, hd[1] - hr*.34);
     c.lineTo(hd[0] - facing*hr*1.9, hd[1] + hr*.18);
@@ -2658,22 +3164,22 @@ function drawCharacter(c, rig, cx, groundY, unit, facing, opts){
   }else if(id === "RIVET"){                       /* welding visor */
     c.beginPath();
     c.moveTo(hd[0] - hr, hd[1] - hr*.30); c.lineTo(hd[0] + hr, hd[1] - hr*.30);
-    c.strokeStyle = "#000"; c.lineWidth = hr*.52; c.stroke();
+    c.strokeStyle = PAL.ink; c.lineWidth = hr*.52; c.stroke();
   }else if(id === "MORTAR"){                      /* flat cap */
     c.beginPath();
     c.moveTo(hd[0] - hr*1.05, hd[1] - hr*.30);
     c.quadraticCurveTo(hd[0], hd[1] - hr*1.30, hd[0] + hr*1.05, hd[1] - hr*.30);
     c.closePath();
-    c.fillStyle = GY; c.fill(); c.lineWidth = ol*2; c.strokeStyle = "#000"; c.stroke();
+    c.fillStyle = GY; c.fill(); c.lineWidth = ol*2; c.strokeStyle = PAL.ink; c.stroke();
   }else if(id === "JITNEY"){                      /* driver's cap with a peak */
     c.beginPath(); c.arc(hd[0], hd[1] - hr*.20, hr*.98, Math.PI, 0);
-    c.fillStyle = "#000"; c.fill();
+    c.fillStyle = PAL.ink; c.fill();
     c.beginPath();
     c.ellipse(hd[0] + facing*hr*.62, hd[1] - hr*.16, hr*.72, hr*.20, 0, 0, 7);
-    c.fillStyle = YL; c.fill(); c.lineWidth = ol*1.8; c.strokeStyle = "#000"; c.stroke();
+    c.fillStyle = YL; c.fill(); c.lineWidth = ol*1.8; c.strokeStyle = PAL.ink; c.stroke();
   }else if(id === "BRINE"){                       /* bucket hat */
     c.beginPath(); c.arc(hd[0], hd[1] - hr*.24, hr*.86, Math.PI, 0);
-    c.fillStyle = WH; c.fill(); c.lineWidth = ol*2; c.strokeStyle = "#000"; c.stroke();
+    c.fillStyle = WH; c.fill(); c.lineWidth = ol*2; c.strokeStyle = PAL.ink; c.stroke();
     c.beginPath();
     c.ellipse(hd[0], hd[1] - hr*.22, hr*1.24, hr*.20, 0, 0, 7);
     c.fillStyle = WH; c.fill(); c.stroke();
@@ -2683,18 +3189,18 @@ function drawCharacter(c, rig, cx, groundY, unit, facing, opts){
     c.lineTo(hd[0] + hr*1.1, hd[1] - hr*.18);
     c.lineTo(hd[0] + hr*.7, hd[1] + hr*.22);
     c.lineTo(hd[0] - hr*.7, hd[1] + hr*.22); c.closePath();
-    c.fillStyle = YL; c.fill(); c.lineWidth = ol*1.8; c.strokeStyle = "#000"; c.stroke();
+    c.fillStyle = YL; c.fill(); c.lineWidth = ol*1.8; c.strokeStyle = PAL.ink; c.stroke();
   }else if(id === "GRIDDLE"){                     /* knotted bandana */
     c.beginPath();
     c.moveTo(hd[0] - hr, hd[1] - hr*.36); c.lineTo(hd[0] + hr, hd[1] - hr*.36);
-    c.strokeStyle = "#000"; c.lineWidth = hr*.44; c.stroke();
+    c.strokeStyle = PAL.ink; c.lineWidth = hr*.44; c.stroke();
     c.beginPath();
     c.moveTo(hd[0] - facing*hr*.95, hd[1] - hr*.36);
     c.lineTo(hd[0] - facing*hr*1.55, hd[1] - hr*.70);
-    c.strokeStyle = "#000"; c.lineWidth = hr*.22; c.lineCap = "round"; c.stroke();
+    c.strokeStyle = PAL.ink; c.lineWidth = hr*.22; c.lineCap = "round"; c.stroke();
   }else if(id === "HALYARD"){                     /* hard hat with a chin strap */
     c.beginPath(); c.arc(hd[0], hd[1] - hr*.14, hr*1.0, Math.PI, 0);
-    c.fillStyle = WH; c.fill(); c.lineWidth = ol*2; c.strokeStyle = "#000"; c.stroke();
+    c.fillStyle = WH; c.fill(); c.lineWidth = ol*2; c.strokeStyle = PAL.ink; c.stroke();
     c.beginPath();
     c.moveTo(hd[0] - hr*1.24, hd[1] - hr*.14); c.lineTo(hd[0] + hr*1.24, hd[1] - hr*.14);
     c.lineWidth = ol*2.2; c.stroke();
@@ -2708,7 +3214,7 @@ function drawCharacter(c, rig, cx, groundY, unit, facing, opts){
   }
   /* eyes look where the fighter faces */
   if(id !== "RIVET" && id !== "TALLY" && !opts.koT){
-    c.fillStyle = "#000";
+    c.fillStyle = PAL.ink;
     /* the eyes look wherever you are aiming */
     const ex = opts.eye ? clamp(opts.eye[0], -1, 1) : facing;
     const ey = opts.eye ? clamp(opts.eye[1], -1, 1) : 0;
@@ -2718,6 +3224,8 @@ function drawCharacter(c, rig, cx, groundY, unit, facing, opts){
             hd[1] + hr * (.16 + ey * .30), hr*.11, 0, 7); c.fill();
     });
   }
+
+  c.restore();
 
   /* front arm on top */
   limb(c, P2("shL"), P2("elL"), unit * .155, WH, ol);
@@ -2733,11 +3241,11 @@ function drawSelectPreview(t){
   const g = ctxOf($("#selCanvas")); if(!g) return;
   const { c, w, h } = g;
   c.clearRect(0, 0, w, h);
-  c.fillStyle = "#F5F5F5"; c.fillRect(0, 0, w, h);
+  c.fillStyle = PAL.wash; c.fillRect(0, 0, w, h);
   const groundY = h * .90, unit = h * .29;
-  c.strokeStyle = "#000"; c.lineWidth = 2;
+  c.strokeStyle = PAL.ink; c.lineWidth = 2;
   c.beginPath(); c.moveTo(0, groundY); c.lineTo(w, groundY); c.stroke();
-  c.strokeStyle = "#D8D8D8"; c.lineWidth = 1;
+  c.strokeStyle = PAL.rule; c.lineWidth = 1;
   for(let i = 1; i < 8; i++){
     const x = w * i / 8;
     c.beginPath(); c.moveTo(x, groundY); c.lineTo(x, groundY + h * .06); c.stroke();
@@ -2774,21 +3282,21 @@ function drawArena(t){
   const g = ctxOf($("#arena")); if(!g) return;
   const { c, w, h } = g;
   c.clearRect(0,0,w,h);
-  c.fillStyle = "#FFF"; c.fillRect(0,0,w,h);
+  c.fillStyle = PAL.paper; c.fillRect(0,0,w,h);
   const groundY = h * .84, unit = h * .145;
   /* back wall frames the action so the fighters read against something */
-  c.fillStyle = "#F5F5F5";
+  c.fillStyle = PAL.wash;
   c.fillRect(0, h * .19, w, groundY - h * .19);
-  c.strokeStyle = "#000"; c.lineWidth = 2;
+  c.strokeStyle = PAL.ink; c.lineWidth = 2;
   c.beginPath(); c.moveTo(0, h * .19); c.lineTo(w, h * .19); c.stroke();
   /* floor */
-  c.strokeStyle = "#000"; c.lineWidth = 3;
+  c.strokeStyle = PAL.ink; c.lineWidth = 3;
   c.beginPath(); c.moveTo(0, groundY); c.lineTo(w, groundY); c.stroke();
   /* camera pans to keep both fighters framed; the floor marks scroll
      with it so movement reads even when the pair stays centred */
   const cam = PL ? clamp((PL.x + OP.x) / 2 - .5, -.16, .16) : 0;
   const X = wx => (wx - cam) * w;
-  c.strokeStyle = "#D8D8D8"; c.lineWidth = 1;
+  c.strokeStyle = PAL.rule; c.lineWidth = 1;
   for(let i = -2; i <= 12; i++){
     const x = X(i / 10);
     if(x < -20 || x > w + 20) continue;
@@ -2803,16 +3311,16 @@ function drawArena(t){
   const px = X(PL.x), ox = X(OP.x);
   /* reach band on the floor, so distance is legible at a glance */
   const inR = Math.abs(PL.x - OP.x) <= PL.reach;
-  c.fillStyle = inR ? "#FFC800" : "#F5F5F5";
+  c.fillStyle = inR ? PAL.yellow : PAL.wash;
   c.fillRect(px, groundY + 3, ox - px, 8);
-  c.strokeStyle = "#000"; c.lineWidth = 1;
+  c.strokeStyle = PAL.ink; c.lineWidth = 1;
   c.strokeRect(px, groundY + 3, ox - px, 8);
 
   /* airborne fighters cast a smaller, fainter shadow on the floor */
   [[px, PL], [ox, OP]].forEach(([sx, ft]) => {
     if(ft.y <= .02) return;
     const k = clamp(1 - ft.y / 3.2, .25, 1);
-    c.fillStyle = "#D8D8D8";
+    c.fillStyle = PAL.rule;
     c.beginPath();
     c.ellipse(sx, groundY + unit * .04, unit * .52 * k, unit * .085 * k, 0, 0, 7);
     c.fill();
@@ -2847,7 +3355,7 @@ function drawArena(t){
 
   hitFx.forEach(f => {
     const r = unit * (f.big ? .95 : .6) * (1 - f.life / .22);
-    c.strokeStyle = "#000"; c.lineWidth = 4;
+    c.strokeStyle = PAL.ink; c.lineWidth = 4;
     c.beginPath(); c.arc(X(f.x), groundY - unit * 1.1, r, 0, 7); c.stroke();
   });
   c.textAlign = "center";
@@ -2859,13 +3367,13 @@ function drawArena(t){
     c.font = "800 " + fs + "px Helvetica, Arial, sans-serif";
     const txt = "-" + d.v;
     const wdt = c.measureText(txt).width + 12;
-    c.fillStyle = d.crit ? "#FFC800" : "#FFF";
+    c.fillStyle = d.crit ? PAL.yellow : PAL.paper;
     c.fillRect(x - wdt/2, y - fs * .85, wdt, fs * 1.1);
-    c.strokeStyle = "#000"; c.lineWidth = 2;
+    c.strokeStyle = PAL.ink; c.lineWidth = 2;
     c.strokeRect(x - wdt/2, y - fs * .85, wdt, fs * 1.1);
-    c.fillStyle = "#000"; c.fillText(txt, x, y);
+    c.fillStyle = PAL.ink; c.fillText(txt, x, y);
     c.font = "700 " + Math.round(unit * .15) + "px Consolas, monospace";
-    c.fillStyle = "#767676"; c.fillText(d.zone, x, y + unit * .32);
+    c.fillStyle = PAL.grey; c.fillText(d.zone, x, y + unit * .32);
     c.globalAlpha = 1;
   });
   c.textAlign = "start";
@@ -2884,7 +3392,7 @@ function drawOverlay(cv){
   const s = Pose.sm;
   if(!Pose.running || !s){
     if(cv.id === "pipC"){
-      c.textAlign = "center"; c.fillStyle = "#767676";
+      c.textAlign = "center"; c.fillStyle = PAL.grey;
       c.font = "700 " + Math.max(9, w * .10) + "px Consolas, monospace";
       c.fillText("NO CAMERA", w/2, h/2 - 2);
       c.font = "400 " + Math.max(8, w * .075) + "px Consolas, monospace";
@@ -2901,23 +3409,23 @@ function drawOverlay(cv){
   const path = new Path2D();
   B.forEach(b => { path.moveTo(X(s[b[0]].x), Y(s[b[0]].y)); path.lineTo(X(s[b[1]].x), Y(s[b[1]].y)); });
   c.lineCap = "round"; c.lineJoin = "round";
-  c.strokeStyle = "#FFC800"; c.lineWidth = 9; c.stroke(path);
-  c.strokeStyle = "#000"; c.lineWidth = 3; c.stroke(path);
+  c.strokeStyle = PAL.yellow; c.lineWidth = 9; c.stroke(path);
+  c.strokeStyle = PAL.ink; c.lineWidth = 3; c.stroke(path);
   [L.NOSE,L.SHL,L.SHR,L.ELL,L.ELR,L.WRL,L.WRR,L.HIPL,L.HIPR,L.KNL,L.KNR,L.ANKL,L.ANKR].forEach(i => {
     c.beginPath(); c.arc(X(s[i].x), Y(s[i].y), 5, 0, 7);
-    c.fillStyle = "#FFF"; c.fill(); c.lineWidth = 2.5; c.strokeStyle = "#000"; c.stroke();
+    c.fillStyle = PAL.paper; c.fill(); c.lineWidth = 2.5; c.strokeStyle = PAL.ink; c.stroke();
   });
 
   /* face mesh: a sparse scatter reads better than 478 dots */
   if(Pose.faceOn && Pose.faceSeen){
-    c.fillStyle = "#000";
+    c.fillStyle = PAL.ink;
     FACE_PTS.forEach(i => {
       const pt = s[i];
       if(pt.v > .4) c.fillRect(X(pt.x) - 2, Y(pt.y) - 2, 4, 4);
     });
     if(Pose.faceCenter){
       const r = Pose.faceCenter.h * h * .78;
-      c.strokeStyle = "#FFC800"; c.lineWidth = 3;
+      c.strokeStyle = PAL.yellow; c.lineWidth = 3;
       c.strokeRect(X(Pose.faceCenter.x) - r/2, Y(Pose.faceCenter.y) - r*.62, r, r*1.35);
     }
   }
@@ -2928,7 +3436,7 @@ function drawOverlay(cv){
    7. SCREENS
    ============================================================ */
 const Screen = { now:"title" };
-const SCREEN_IDS = ["title","setup","select","fight","result","online","shop","profile","account","abilities"];
+const SCREEN_IDS = ["title","setup","select","fight","result","online","lobby","shop","profile","account","abilities"];
 function go(id){
   const el = $("#s-" + id);
   if(!el) return;                      /* an unknown hash must not blank the app */
@@ -2941,6 +3449,7 @@ function go(id){
   if(id === "account") paintAccount();
   if(id === "abilities") paintAbilities();
   if(id === "title") paintTitle();
+  if(id === "lobby") paintLobby();
   if(id !== "fight") Match.on = false;
   location.hash = id;
 }
@@ -3056,7 +3565,7 @@ function refreshGates(){
                              : why + " · or play now with A/D to punch, W to step in";
   }
   const nf = $("#btnNetFight");
-  if(nf) nf.disabled = !(Net.on && Net.host);
+  if(nf) nf.disabled = !Net.on;
   const pill = $("#tCam");
   if(pill){
     pill.textContent = Pose.running ? (Pose.cal ? "CAMERA ON" : "CALIBRATE") : "CAMERA OFF";
@@ -3089,6 +3598,10 @@ function paintRoster(){
       }else{ toast(f.id + " needs " + unlockText(f) + "."); return; }
     }
     P.fighter = f.id; save(); paintRoster(); paintFighterPanel();
+    if(Net.on){                                   /* keep your seat's fighter honest */
+      if(Net.host){ const x = seatOf(Net.me); if(x){ x.fighter = f.id; pushLobby(); } }
+      else sendRaw(Net.hostConn, { t:"me", f:f.id });
+    }
   }));
   paintFighterPanel();
   $("#diffRow").innerHTML = ["Dummy","Easy","Medium","Hard"].map((d,i) =>
@@ -3133,9 +3646,9 @@ function drawMovePreview(cv, id, time){
   const g = ctxOf(cv); if(!g) return;
   const { c, w, h } = g;
   c.clearRect(0,0,w,h);
-  c.fillStyle = "#F5F5F5"; c.fillRect(0,0,w,h);
+  c.fillStyle = PAL.wash; c.fillRect(0,0,w,h);
   const groundY = h * .88, unit = h * .27;
-  c.strokeStyle = "#000"; c.lineWidth = 2;
+  c.strokeStyle = PAL.ink; c.lineWidth = 2;
   c.beginPath(); c.moveTo(0, groundY); c.lineTo(w, groundY); c.stroke();
 
   const kind = AB_MOVE[id] || "strike";
@@ -3169,7 +3682,7 @@ function drawMovePreview(cv, id, time){
     { id:me.f.id, glow: me.anim === "PUNCH_R" || kind === "buff", koT:0 });
 
   if(kind === "heal" && t > .2){
-    c.fillStyle = "#FFC800"; c.strokeStyle = "#000"; c.lineWidth = 2;
+    c.fillStyle = PAL.yellow; c.strokeStyle = PAL.ink; c.lineWidth = 2;
     for(let i = 0; i < 3; i++){
       const yy = groundY - unit * (1.6 + i * .5) - (t * 30);
       c.beginPath(); c.arc(mx + (i - 1) * unit * .3, yy, 5, 0, 7); c.fill(); c.stroke();
@@ -3424,7 +3937,7 @@ async function cloudBoot(){
     if(r.ok && r.username){
       Cloud.user = r.username;
       if(r.data && typeof r.data === "object"){
-        P = Object.assign({}, DEFAULT_SAVE, r.data);   /* the account wins */
+        P = Object.assign({}, DEFAULT_SAVE, migrate(r.data));   /* the account wins */
         try{ localStorage.setItem(SAVE_KEY, JSON.stringify(P)); }catch(e){}
       }
     }
@@ -3459,6 +3972,7 @@ $("#tabUp").addEventListener("click", () => setAuthMode("register"));
 $("#tAcct").addEventListener("click", () => go("account"));
 $("#tMode").addEventListener("click", toggleInputMode);
 $("#btnModeSide").addEventListener("click", toggleInputMode);
+$("#btnTheme").addEventListener("click", toggleTheme);
 
 $("#btnAuth").addEventListener("click", async () => {
   if(Cloud.busy) return;
@@ -3476,7 +3990,7 @@ $("#btnAuth").addEventListener("click", async () => {
       $("#acctMsg").textContent = r.error || r.reason || "That did not work.";
     }else{
       Cloud.user = r.username;
-      if(r.data && typeof r.data === "object") P = Object.assign({}, DEFAULT_SAVE, r.data);
+      if(r.data && typeof r.data === "object") P = Object.assign({}, DEFAULT_SAVE, migrate(r.data));
       save();
       $("#acctPass").value = "";
       paintAccount(); paintTitle(); paintTopbar();
@@ -3501,6 +4015,7 @@ $("#btnSyncNow").addEventListener("click", async () => {
   }catch(e){ $("#acctSync").textContent = "Could not reach the server."; }
 });
 
+applyTheme();
 const dailyBonus = checkLoginStreak();
 paintTopbar(); paintTitle();
 if(dailyBonus){
