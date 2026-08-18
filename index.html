@@ -277,6 +277,24 @@ kbd{font-family:var(--mono); font-size:11px; border:1px solid var(--ink); paddin
 }
 .gate .steps b{color:var(--ink)}
 #tCam{cursor:pointer}
+.srow{display:grid; gap:4px}
+.srow .lab{display:flex; justify-content:space-between; align-items:baseline}
+.srow input[type=range]{
+  -webkit-appearance:none; appearance:none; width:100%; height:22px; background:transparent; cursor:pointer;
+}
+.srow input[type=range]::-webkit-slider-runnable-track{height:8px; background:var(--wash); border:1px solid var(--ink)}
+.srow input[type=range]::-webkit-slider-thumb{
+  -webkit-appearance:none; appearance:none; width:16px; height:22px; margin-top:-8px;
+  background:var(--yellow); border:2px solid var(--ink);
+}
+.srow input[type=range]::-moz-range-track{height:8px; background:var(--wash); border:1px solid var(--ink)}
+.srow input[type=range]::-moz-range-thumb{width:14px; height:20px; background:var(--yellow); border:2px solid var(--ink); border-radius:0}
+.fing{display:flex; gap:3px}
+.fing i{
+  width:16px; height:22px; border:1px solid var(--rule); background:var(--paper);
+  font-family:var(--mono); font-size:9px; font-style:normal; display:grid; place-items:center; color:var(--grey);
+}
+.fing i.up{background:var(--yellow); border-color:var(--ink); color:var(--ink)}
 .toast{
   position:fixed; left:50%; bottom:18px; transform:translateX(-50%);
   background:var(--ink); color:var(--paper); font-family:var(--mono); font-size:12px;
@@ -323,7 +341,6 @@ kbd{font-family:var(--mono); font-size:11px; border:1px solid var(--ink); paddin
     <span class="hudstat">LV <b id="tLv">1</b></span>
     <span class="hudstat">XP <b id="tXp">0</b></span>
     <span class="hudstat coin">COINS <b id="tCoins">0</b></span>
-    <span class="pill" id="tInput">KEYBOARD</span>
     <span class="pill" id="tCam">CAMERA OFF</span>
   </header>
 
@@ -376,8 +393,7 @@ kbd{font-family:var(--mono); font-size:11px; border:1px solid var(--ink); paddin
               <p id="ctaText">MediaPipe Pose reads your body directly in this tab. Nothing is uploaded and no video leaves your machine.</p>
               <button class="btn primary big" id="btnStartCam">Start camera</button>
               <p class="note" id="ctaHint" style="max-width:44ch"></p>
-              <button class="btn quiet" data-go="title">Play with keyboard instead</button>
-            </div>
+                      </div>
           </div>
         </div>
         <div class="setup-side">
@@ -387,6 +403,24 @@ kbd{font-family:var(--mono); font-size:11px; border:1px solid var(--ink); paddin
           <div class="row"><span>Tracking quality</span><span class="qbar" id="qbar"></span></div>
           <div class="row"><span>Current action</span><b id="rAct">&mdash;</b></div>
           <div class="row"><span>Punch speed</span><b id="rSpeed">&mdash;</b></div>
+          <div class="row"><span>Hand tracking</span><b id="rHands">LOADING</b></div>
+          <div class="row"><span>Face scan</span><b id="rFace">LOADING</b></div>
+          <div class="row"><span>Left hand</span><span class="fing" id="fingL"></span></div>
+          <div class="row"><span>Right hand</span><span class="fing" id="fingR"></span></div>
+          <div class="row"><span>Face</span><b id="rFaceState">&mdash;</b></div>
+
+          <div class="srow">
+            <span class="lab"><span class="lbl">Movement sensitivity</span><b class="lbl" id="vMove">0.62</b></span>
+            <input type="range" id="sMove" min="0" max="1" step="0.01" value="0.62">
+            <p class="note">How far a step in front of your camera moves your fighter.</p>
+          </div>
+          <div class="srow">
+            <span class="lab"><span class="lbl">Punch sensitivity</span><b class="lbl" id="vPunch">0.62</b></span>
+            <input type="range" id="sPunch" min="0" max="1" step="0.01" value="0.62">
+            <p class="note">Higher fires on a shorter jab. Lower needs a fuller extension.</p>
+          </div>
+          <div class="row"><span>Track hands</span><span class="toggle on" id="tgHands"><i></i></span></div>
+          <div class="row"><span>Track face</span><span class="toggle on" id="tgFace"><i></i></span></div>
           <span class="lbl" style="margin-top:4px">Try each move</span>
           <div id="gestList" style="display:grid; gap:4px"></div>
           <div style="border:1px solid var(--rule); padding:9px; display:grid; gap:5px">
@@ -431,6 +465,8 @@ kbd{font-family:var(--mono); font-size:11px; border:1px solid var(--ink); paddin
             <span class="lbl">Difficulty</span>
             <div style="display:flex; gap:5px; flex-wrap:wrap" id="diffRow"></div>
             <button class="btn primary big" id="btnFight">Fight</button>
+            <p class="note" id="fightNote"></p>
+            <button class="btn quiet" data-go="setup">Camera setup</button>
           </div>
         </div>
       </div>
@@ -596,14 +632,16 @@ kbd{font-family:var(--mono); font-size:11px; border:1px solid var(--ink); paddin
           </div>
           <div class="card">
             <h3>Controls</h3>
-            <div class="kv"><span>Punch left / right</span><b><kbd>A</kbd> <kbd>D</kbd></b></div>
-            <div class="kv"><span>Heavy</span><b><kbd>S</kbd></b></div>
-            <div class="kv"><span>Block</span><b><kbd>Shift</kbd></b></div>
-            <div class="kv"><span>Step in / out</span><b><kbd>W</kbd> <kbd>X</kbd></b></div>
-            <div class="kv"><span>Dodge</span><b><kbd>Q</kbd> <kbd>E</kbd></b></div>
-            <div class="kv"><span>Crouch</span><b><kbd>C</kbd></b></div>
-            <div class="kv"><span>Ultimate</span><b><kbd>R</kbd></b></div>
+            <div class="kv"><span>Move left / right</span><b>Step left or right</b></div>
+            <div class="kv"><span>Punch</span><b>Thrust a hand out</b></div>
+            <div class="kv"><span>Heavy punch</span><b>Close your fist</b></div>
+            <div class="kv"><span>Block</span><b>Open palms up</b></div>
+            <div class="kv"><span>Crouch</span><b>Drop your hips</b></div>
+            <div class="kv"><span>Step in / back</span><b>Lean toward the camera</b></div>
+            <div class="kv"><span>Ultimate</span><b>Both hands high, hold</b></div>
             <div class="kv"><span>Pause</span><b><kbd>Esc</kbd></b></div>
+            <p class="note">Damage needs range, hand speed and a good zone. Head hits pay most.</p>
+          </div>
           </div>
         </div>
         <button class="btn quiet" data-go="title" style="justify-self:start">Back</button>
@@ -621,7 +659,7 @@ kbd{font-family:var(--mono); font-size:11px; border:1px solid var(--ink); paddin
   <div class="steps">Stand back until your <b>head, hands and hips</b> are all in frame.</div>
   <div class="row">
     <button class="btn primary big" id="gateStart">Turn on camera</button>
-    <button class="btn" id="gateSkip">Play with keyboard</button>
+    <button class="btn" id="gateSkip">Not now</button>
   </div>
   <p class="note" id="gateHint"></p>
 </div>
@@ -646,7 +684,7 @@ const DEFAULT_SAVE = {
   owned:["RIVET","KESTREL","PANEL"],
   /* everything below is device-local too, so a reload picks up exactly
      where you left off — including your body calibration */
-  mirror:true, sensitivity:.62, cal:null, name:"you",
+  mirror:true, sensitivity:.62, punchSens:.62, cal:null, name:"you",
   matches:0, totalDmg:0, onlineWins:0
 };
 function xpForLevel(lv){ return 300 + (lv-1)*250; }
@@ -733,11 +771,19 @@ const L = { NOSE:0, SHL:11, SHR:12, ELL:13, ELR:14, WRL:15, WRR:16,
             HIPL:23, HIPR:24, KNL:25, KNR:26, ANKL:27, ANKR:28 };
 const CDN = "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14";
 const MODEL = "https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/1/pose_landmarker_lite.task";
+const HAND_MODEL = "https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task";
+const FACE_MODEL = "https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task";
+/* hand landmark indices: fingertip and the joint below it, per finger */
+const FINGERS = [[4,2],[8,6],[12,10],[16,14],[20,18]];
+const FINGER_NAMES = ["thumb","index","middle","ring","pinky"];
 
 const Pose = {
   ready:false, running:false, landmarker:null, stream:null,
   raw:null, sm:null, quality:0, fps:0, mirror:true, error:null,
   cal:null, action:"—", lastSpeed:0,
+  hander:null, facer:null, handsOn:true, faceOn:true,
+  hands:{ L:null, R:null }, face:null, faceSeen:false, mouth:0, tilt:0,
+  handRaw:[], faceRaw:null, faceCenter:null, tick:0,
   vel:{ L:{x:0,y:0,v:0}, R:{x:0,y:0,v:0} },
   hold:{}, cooldown:{}, events:[]
 };
@@ -771,19 +817,36 @@ async function startCamera(){
     });
     Pose.ready = true; Pose.running = true; Pose.error = null;
     $("#rPose").textContent = "ACTIVE";
+
+    /* hands and face load after pose so the game is playable sooner */
+    (async () => {
+      try{
+        Pose.hander = await vision.HandLandmarker.createFromOptions(fileset, {
+          baseOptions:{ modelAssetPath: HAND_MODEL, delegate:"GPU" },
+          runningMode:"VIDEO", numHands:2,
+          minHandDetectionConfidence:.5, minTrackingConfidence:.5
+        });
+        setTxt("#rHands", "ACTIVE");
+      }catch(e){ setTxt("#rHands", "UNAVAILABLE"); Pose.handsOn = false; }
+      try{
+        Pose.facer = await vision.FaceLandmarker.createFromOptions(fileset, {
+          baseOptions:{ modelAssetPath: FACE_MODEL, delegate:"GPU" },
+          runningMode:"VIDEO", numFaces:1
+        });
+        setTxt("#rFace", "ACTIVE");
+      }catch(e){ setTxt("#rFace", "UNAVAILABLE"); Pose.faceOn = false; }
+    })();
     $("#camCta").classList.add("hide");
-    $("#tInput").textContent = "CAMERA";
-    $("#tInput").classList.add("on");
     toast("Camera live. Stand back until your hips are in frame, then Calibrate.");
-    setTimeout(() => { if(!Pose.cal) calibrate(); }, 1500);
+    /* calibration now happens automatically as soon as you are in frame */
   }catch(err){
     Pose.error = err;
     Pose.running = false;
     $("#rCam").textContent = Pose.stream ? "ON" : "BLOCKED";
     $("#rPose").textContent = "UNAVAILABLE";
     cta.innerHTML = "<b>" + String(err.message || err) + "</b><br>" +
-      "The game stays fully playable on the keyboard — press Play.";
-    toast("Camera unavailable — keyboard controls active.");
+      "Fights need the camera, so fix this and try again.";
+    toast("Camera unavailable — fights are locked until it works.");
   }
 }
 function setPill(el, t){ el.textContent = t; }
@@ -850,15 +913,25 @@ function recognize(dt){
   }
 
   /* posture booleans */
+  const handL = Pose.hands.L, handR = Pose.hands.R;
+  const palmsOpen = !!(handL && handL.open) && !!(handR && handR.open);
   const bothUp = s[L.WRL].y < nose.y && s[L.WRR].y < nose.y;
   const crouch = hp.y > cal.hipY + cal.torso * .28;
-  const shift = (sh.x - cal.centerX) / cal.shoulderW;
   const scale = dist(s[L.SHL], s[L.SHR]) / cal.shoulderW;   /* lean in => wider */
 
-  Input.block = bothUp && !cool("ult");
+  /* Direct left/right mapping: where you stand in the frame is where your
+     fighter stands. The preview is mirrored, so screen-left is your left. */
+  const rawX = Pose.mirror ? 1 - sh.x : sh.x;
+  const centerX = Pose.mirror ? 1 - cal.centerX : cal.centerX;
+  const gain = 1.0 + P.sensitivity * 2.6;
+  Input.posX = clamp(.5 + (rawX - centerX) * gain, ARENA.left, ARENA.right);
+  Input.posActive = true;
+
+  /* open palms held up = guard; a fist is a committed strike */
+  Input.block = (bothUp && !cool("ult")) || (palmsOpen && bothUp);
   Input.crouch = crouch;
   Input.lean = clamp((scale - 1) * 2.4, -1, 1);
-  Input.strafe = clamp(shift * .9, -1, 1);
+  Input.strafe = 0;
 
   /* punches: extension past a ratio of the player's own arm */
   for(const side of ["L","R"]){
@@ -866,11 +939,17 @@ function recognize(dt){
     const so = side === "L" ? s[L.SHL] : s[L.SHR];
     const ext = dist(wr, so) / cal.armLen;
     const key = "punch" + side;
-    if(ext > .78 && !cool(key) && !bothUp){
+    const thresh = .92 - P.punchSens * .28;            /* sensitivity slider */
+    if(ext > thresh && !cool(key) && !bothUp){
       const speedMs = Pose.vel[side].v * 1.7;          /* body-height scaled */
       if(speedMs > .7){
-        const zone = wr.y < nose.y + .04 ? "HEAD" : wr.y < cal.hipY ? "BODY" : "LOW";
-        Pose.events.push({ type:"PUNCH", side, speed:speedMs, zone });
+        /* the face scan gives a truer head line than the nose landmark alone */
+        const headY = Pose.faceSeen && Pose.faceCenter
+          ? Pose.faceCenter.y + Pose.faceCenter.h * .35 : nose.y + .04;
+        const zone = wr.y < headY ? "HEAD" : wr.y < cal.hipY ? "BODY" : "LOW";
+        const hand = Pose.hands[side];
+        const heavy = !!(hand && hand.fist);           /* closed fist hits harder */
+        Pose.events.push({ type:"PUNCH", side, speed:speedMs, zone, heavy });
         Pose.lastSpeed = speedMs;
         setCool(key, 240);
         Pose.action = side === "L" ? "LEFT PUNCH" : "RIGHT PUNCH";
@@ -888,8 +967,10 @@ function recognize(dt){
   } else Pose.hold.ult = 0;
 
   if(!Pose.actionUntil || now > Pose.actionUntil){
-    Pose.action = Input.block ? "BLOCK" : crouch ? "CROUCH" :
-      Input.strafe < -.35 ? "DODGE LEFT" : Input.strafe > .35 ? "DODGE RIGHT" :
+    const off = Input.posX - .5;
+    Pose.action = Input.block ? (palmsOpen ? "GUARD (PALMS)" : "BLOCK") :
+      crouch ? "CROUCH" :
+      off < -.10 ? "MOVE LEFT" : off > .10 ? "MOVE RIGHT" :
       Input.lean > .3 ? "STEP IN" : Input.lean < -.3 ? "STEP BACK" : "GUARD";
   }
 
@@ -915,40 +996,89 @@ function poseTick(dt){
   if(res && res.landmarks && res.landmarks.length){
     Pose.raw = res.landmarks[0];
     smooth(Pose.raw);
+    if(!Pose.cal){
+      /* keep trying until the player is actually in frame, rather than
+         calibrating once on a timer and locking them out if they were late */
+      const keyPts = [L.NOSE, L.SHL, L.SHR, L.HIPL, L.HIPR];
+      let q = 0; keyPts.forEach(k => q += Pose.sm[k].v);
+      Pose.quality = q / keyPts.length;
+      const good = Pose.quality > .6;
+      Pose.autoCal = good ? (Pose.autoCal || 0) + dt : 0;
+      Pose.action = good ? "HOLD STILL — CALIBRATING" : "STAND BACK INTO FRAME";
+      if(Pose.autoCal > 1.0) calibrate();
+    }
     recognize(dt);
   }else{
     Pose.quality = 0;
     Pose.action = "NO BODY";
   }
+
+  /* stagger the heavier models so they never starve pose tracking */
+  Pose.tick++;
+  if(Pose.handsOn && Pose.hander && Pose.tick % 2 === 0){
+    try{ readHands(Pose.hander.detectForVideo(v, t0 + 1)); }catch(e){}
+  }
+  if(Pose.faceOn && Pose.facer && Pose.tick % 3 === 0){
+    try{ readFace(Pose.facer.detectForVideo(v, t0 + 2)); }catch(e){}
+  }
+}
+function setTxt(sel, t){ const e = $(sel); if(e) e.textContent = t; }
+
+/* ---- fingers ---- */
+function readHands(res){
+  Pose.handRaw = (res && res.landmarks) || [];
+  const out = { L:null, R:null };
+  const names = (res && res.handedness) || [];
+  Pose.handRaw.forEach((lm, i) => {
+    const label = (names[i] && names[i][0] && names[i][0].categoryName) || (i ? "Right" : "Left");
+    const wrist = lm[0];
+    const up = [];
+    FINGERS.forEach(([tip, joint], fi) => {
+      const dTip = Math.hypot(lm[tip].x - wrist.x, lm[tip].y - wrist.y);
+      const dJoint = Math.hypot(lm[joint].x - wrist.x, lm[joint].y - wrist.y);
+      up.push(dTip > dJoint * (fi === 0 ? 1.18 : 1.12));
+    });
+    const count = up.filter(Boolean).length;
+    /* the preview is mirrored, so MediaPipe's "Left" is the hand on your right */
+    const side = label === "Left" ? "R" : "L";
+    out[side] = { count, up, open: count >= 4, fist: count <= 1,
+                  x:wrist.x, y:wrist.y,
+                  named: FINGER_NAMES.filter((n, k) => up[k]) };
+  });
+  Pose.hands = out;
+}
+
+/* ---- face ---- */
+function readFace(res){
+  const lm = res && res.faceLandmarks && res.faceLandmarks[0];
+  Pose.faceRaw = lm || null;
+  if(!lm){ Pose.faceSeen = false; return; }
+  Pose.faceSeen = true;
+  const top = lm[10], chin = lm[152], upper = lm[13], lower = lm[14];
+  const faceH = Math.hypot(top.x - chin.x, top.y - chin.y) || .001;
+  Pose.mouth = Math.hypot(upper.x - lower.x, upper.y - lower.y) / faceH;
+  const le = lm[33], re = lm[263];
+  Pose.tilt = Math.atan2(re.y - le.y, re.x - le.x);
+  Pose.faceCenter = { x:(le.x + re.x) / 2, y:(le.y + re.y) / 2, h:faceH };
 }
 
 /* ============================================================
-   4. INPUT ROUTER — pose + keyboard collapse into one state
+   4. INPUT ROUTER — pose, fingers and face become one action stream
    ============================================================ */
-const Input = { block:false, crouch:false, lean:0, strafe:0, events:[] };
-const keys = {};
+const Input = { block:false, crouch:false, lean:0, strafe:0, posX:.5, posActive:false, events:[] };
+/* Motion is the only control scheme. Esc still pauses, because that is a
+   menu action rather than a way to fight. */
 addEventListener("keydown", e => {
   if(e.target.matches("input,textarea")) return;
-  const k = e.key.toLowerCase();
-  if(["w","a","s","d","x","q","e","c","r","shift"," ","escape"].indexOf(k) >= 0) e.preventDefault();
-  if(keys[k]) return;
-  keys[k] = true;
-  if(k === "escape" && Screen.now === "fight") togglePause();
-  if(Screen.now !== "fight" || Match.paused) return;
-  const zone = keys["arrowup"] ? "HEAD" : (keys["c"] ? "LOW" : "BODY");
-  if(k === "a") Input.events.push({ type:"PUNCH", side:"L", speed:2.6, zone });
-  if(k === "d") Input.events.push({ type:"PUNCH", side:"R", speed:2.6, zone });
-  if(k === "s") Input.events.push({ type:"PUNCH", side:"R", speed:3.6, zone:"HEAD", heavy:true });
-  if(k === "r") Input.events.push({ type:"ULT" });
+  if(e.key === "Escape" && Screen.now === "fight" && !gateEl.classList.contains("on")){
+    e.preventDefault(); togglePause();
+  }
 });
-addEventListener("keyup", e => { keys[e.key.toLowerCase()] = false; });
-
-function pollKeyboard(){
-  if(Pose.running && Pose.cal) return;         /* camera owns the stick when live */
-  Input.block = !!keys["shift"];
-  Input.crouch = !!keys["c"];
-  Input.lean = (keys["w"] ? 1 : 0) - (keys["x"] ? 1 : 0);
-  Input.strafe = (keys["e"] ? 1 : 0) - (keys["q"] ? 1 : 0);
+function canFight(){ return !!(Pose.running && Pose.cal); }
+function fightBlockReason(){
+  if(!Pose.running) return "Camera off — turn it on to fight";
+  if(!Pose.cal) return "Stand back until your head, hands and hips are in frame — it calibrates itself";
+  return "";
 }
 function drainEvents(){
   const out = Input.events.concat(Pose.events);
@@ -982,6 +1112,7 @@ function makeFighter(f, x, facing, isBot){
   };
 }
 function startMatch(online){
+  if(!canFight()){ toast(fightBlockReason()); go("setup"); return; }
   const me = byId(P.fighter);
   const pool = FIGHTERS.filter(f => f.id !== me.id);
   const foe = online ? byId(Net.remoteFighter) : pool[Math.floor(Math.random() * pool.length)];
@@ -1115,7 +1246,7 @@ function endMatch(playerWon){
     "TOP COMBO x" + Match.best,
     "HITS " + Match.hits,
     "OUT OF RANGE " + Match.whiffs,
-    Match.fastest ? "FASTEST " + Match.fastest.toFixed(1) + " M/S" : "KEYBOARD"
+    Match.fastest ? "FASTEST " + Match.fastest.toFixed(1) + " M/S" : "NO CLEAN HITS"
   ];
   if(leveled) chips.unshift("LEVEL UP");
   $("#resChips").innerHTML = chips.map(c => '<span class="pill live">' + c + "</span>").join("");
@@ -1205,8 +1336,13 @@ function matchTick(dt){
 
   /* player movement from lean/strafe */
   PL.blocking = Input.block;
-  const drive = Input.lean * .7 + Input.strafe * .5;
-  PL.x = clamp(PL.x + drive * PL.speed * dt, ARENA.left, ARENA.right);
+  if(Input.posActive){
+    /* your position in frame IS your position in the arena */
+    PL.x = lerp(PL.x, Input.posX, clamp(dt * 10, 0, 1));
+  }else{
+    const drive = Input.lean * .7 + Input.strafe * .5;
+    PL.x = clamp(PL.x + drive * PL.speed * dt, ARENA.left, ARENA.right);
+  }
 
   drainEvents().forEach(ev => {
     if(Match.state !== "fight") return;
@@ -1270,7 +1406,7 @@ function paintFightHud(){
   cb.classList.toggle("show", Match.combo >= 2);
   $("#comboN").textContent = "x" + Match.combo;
   $("#comboRate").textContent = Match.combo >= 8 ? "SAVAGE" : Match.combo >= 5 ? "PERFECT" : "COMBO";
-  $("#pipAct").textContent = Pose.running ? Pose.action : "KEYBOARD";
+  $("#pipAct").textContent = Pose.running ? Pose.action : "NO CAMERA";
   $("#pipQ").textContent = Pose.running ? Math.round(Pose.quality * 100) + "%" : "—";
 }
 function togglePause(){
@@ -1749,7 +1885,7 @@ function drawOverlay(cv){
       c.font = "700 " + Math.max(9, w * .10) + "px Consolas, monospace";
       c.fillText("NO CAMERA", w/2, h/2 - 2);
       c.font = "400 " + Math.max(8, w * .075) + "px Consolas, monospace";
-      c.fillText("KEYBOARD MODE", w/2, h/2 + w * .11);
+      c.fillText("REQUIRED", w/2, h/2 + w * .11);
       c.textAlign = "start";
     }
     return;
@@ -1767,6 +1903,34 @@ function drawOverlay(cv){
   [L.NOSE,L.SHL,L.SHR,L.ELL,L.ELR,L.WRL,L.WRR,L.HIPL,L.HIPR,L.KNL,L.KNR,L.ANKL,L.ANKR].forEach(i => {
     c.beginPath(); c.arc(X(s[i].x), Y(s[i].y), 5, 0, 7);
     c.fillStyle = "#FFF"; c.fill(); c.lineWidth = 2.5; c.strokeStyle = "#000"; c.stroke();
+  });
+
+  /* face mesh: a sparse scatter reads better than 478 dots */
+  if(Pose.faceOn && Pose.faceRaw){
+    c.fillStyle = "#000";
+    for(let i = 0; i < Pose.faceRaw.length; i += 6){
+      const pt = Pose.faceRaw[i];
+      c.fillRect(X(pt.x) - 1, Y(pt.y) - 1, 2, 2);
+    }
+    if(Pose.faceCenter){
+      const r = Pose.faceCenter.h * h * .78;
+      c.strokeStyle = "#FFC800"; c.lineWidth = 3;
+      c.strokeRect(X(Pose.faceCenter.x) - r/2, Y(Pose.faceCenter.y) - r*.62, r, r*1.35);
+    }
+  }
+
+  /* hands: bones plus a fingertip dot per extended finger */
+  const HB = [[0,1],[1,2],[2,3],[3,4],[0,5],[5,6],[6,7],[7,8],[5,9],[9,10],[10,11],[11,12],
+              [9,13],[13,14],[14,15],[15,16],[13,17],[17,18],[18,19],[19,20],[0,17]];
+  (Pose.handRaw || []).forEach(lm => {
+    const hp2 = new Path2D();
+    HB.forEach(([a, bx]) => { hp2.moveTo(X(lm[a].x), Y(lm[a].y)); hp2.lineTo(X(lm[bx].x), Y(lm[bx].y)); });
+    c.strokeStyle = "#FFC800"; c.lineWidth = 6; c.stroke(hp2);
+    c.strokeStyle = "#000"; c.lineWidth = 2; c.stroke(hp2);
+    FINGERS.forEach(([tip]) => {
+      c.beginPath(); c.arc(X(lm[tip].x), Y(lm[tip].y), 4, 0, 7);
+      c.fillStyle = "#FFC800"; c.fill(); c.lineWidth = 2; c.strokeStyle = "#000"; c.stroke();
+    });
   });
 }
 
@@ -1802,6 +1966,26 @@ $("#btnPlay").addEventListener("click", () => go("select"));
 $("#btnSetup").addEventListener("click", () => go("setup"));
 $("#btnStartCam").addEventListener("click", startCamera);
 $("#btnCalib").addEventListener("click", calibrate);
+function bindSlider(sel, out, key){
+  const el = $(sel);
+  el.value = P[key];
+  $(out).textContent = (+P[key]).toFixed(2);
+  el.addEventListener("input", () => {
+    P[key] = +el.value;
+    $(out).textContent = P[key].toFixed(2);
+  });
+  el.addEventListener("change", save);
+}
+bindSlider("#sMove", "#vMove", "sensitivity");
+bindSlider("#sPunch", "#vPunch", "punchSens");
+$("#tgHands").addEventListener("click", () => {
+  Pose.handsOn = $("#tgHands").classList.toggle("on");
+  if(!Pose.handsOn){ Pose.hands = { L:null, R:null }; Pose.handRaw = []; }
+});
+$("#tgFace").addEventListener("click", () => {
+  Pose.faceOn = $("#tgFace").classList.toggle("on");
+  if(!Pose.faceOn){ Pose.faceRaw = null; Pose.faceSeen = false; }
+});
 $("#btnMirror").addEventListener("click", () => {
   Pose.mirror = !Pose.mirror;
   applyMirror(); P.mirror = Pose.mirror; save();
@@ -1821,6 +2005,24 @@ $("#btnReset").addEventListener("click", () => {
   toast("Progress reset.");
 });
 
+/* every route into a fight is disabled until the camera is tracking */
+function refreshGates(){
+  const ok = canFight(), why = fightBlockReason();
+  const bf = $("#btnFight");
+  if(bf){
+    bf.disabled = !ok;
+    bf.textContent = ok ? "Fight" : "Camera required";
+    const n = $("#fightNote");
+    if(n) n.textContent = ok ? "Tracking live — step in and swing." : why;
+  }
+  const nf = $("#btnNetFight");
+  if(nf) nf.disabled = !(ok && Net.on && Net.host);
+  const pill = $("#tCam");
+  if(pill){
+    pill.textContent = Pose.running ? (Pose.cal ? "CAMERA ON" : "CALIBRATE") : "CAMERA OFF";
+    pill.classList.toggle("on", ok);
+  }
+}
 function paintTitle(){
   $("#titleStats").innerHTML = [
     "LEVEL " + P.lv, P.coins.toLocaleString() + " COINS",
@@ -1956,6 +2158,17 @@ function paintSetup(){
   const ba = $("#bigAct");
   ba.textContent = act;
   ba.classList.toggle("show", Pose.running && act !== "GUARD" && act !== "—");
+
+  ["L","R"].forEach(side => {
+    const el = $("#fing" + side), hnd = Pose.hands[side];
+    if(!el) return;
+    el.innerHTML = FINGER_NAMES.map((n, i) =>
+      '<i class="' + (hnd && hnd.up[i] ? "up" : "") + '">' + n.charAt(0).toUpperCase() + "</i>").join("") +
+      '<i class="' + (hnd && hnd.fist ? "up" : "") + '" title="fist">' + (hnd ? hnd.count : "-") + "</i>";
+  });
+  const fs = $("#rFaceState");
+  if(fs) fs.textContent = !Pose.faceOn ? "OFF" : Pose.faceSeen
+    ? ("SEEN · MOUTH " + Math.round(Pose.mouth * 100) + "%") : "NO FACE";
 }
 
 let toastT = 0;
@@ -1972,7 +2185,7 @@ function frame(now){
   let dt = (now - last) / 1000; last = now;
   if(dt > .1) dt = .1;
   poseTick(dt);
-  pollKeyboard();
+  refreshGates();
   if(toastT > 0){ toastT -= dt; if(toastT <= 0) $("#toast").classList.remove("show"); }
   if(Screen.now === "setup"){ drawOverlay($("#overlay")); paintSetup(); }
   if(Screen.now === "fight"){ matchTick(dt); netTick(now); drawArena(now / 1000); drawOverlay($("#pipC")); }
@@ -1998,7 +2211,7 @@ function openGate(){
   gateEl.classList.add("on");
   $("#gateStart").disabled = false;
   $("#gateStart").textContent = Pose.running ? "Restart camera" : "Turn on camera";
-  $("#gateSkip").textContent = Pose.running ? "Back to the game" : "Play with keyboard";
+  $("#gateSkip").textContent = Pose.running ? "Back to the game" : "Not now";
   $("#gateHint").textContent = "";
 }
 async function cameraPermission(){
@@ -2035,14 +2248,14 @@ async function bootCamera(){
   if(state === "denied"){
     $("#gateTitle").textContent = "Your browser is blocking the camera";
     $("#gateText").innerHTML = "Click the camera icon in the address bar, allow this site, then reload. " +
-      "You can still play on the keyboard in the meantime.";
+      "Fights stay locked until the camera is allowed.";
     $("#gateStart").textContent = "Try anyway";
   }
 }
 $("#gateStart").addEventListener("click", runGateStart);
 $("#gateSkip").addEventListener("click", () => {
   closeGate();
-  if(!Pose.running) toast("Keyboard controls active. Press the camera pill up top to switch on.");
+  if(!Pose.running) toast("You can look around, but fights need the camera on.");
 });
 $("#tCam").addEventListener("click", openGate);
 addEventListener("keydown", e => { if(e.key === "Escape" && gateEl.classList.contains("on")) closeGate(); });
