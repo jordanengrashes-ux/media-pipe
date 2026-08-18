@@ -200,7 +200,7 @@ h1,h2,h3{margin:0; letter-spacing:-.01em}
 .range .y{position:absolute; top:-4px; bottom:-4px; width:4px; background:var(--ink)}
 .rlab{font-family:var(--mono); font-size:11px; font-weight:700; letter-spacing:.08em; text-transform:uppercase}
 .fhud-bot{display:flex; justify-content:space-between; align-items:flex-end; gap:12px}
-.pip{width:clamp(120px,14vw,190px); aspect-ratio:4/3; border:2px solid var(--ink); background:var(--wash); position:relative; overflow:hidden}
+.pip{width:clamp(120px,14vw,190px); aspect-ratio:4/3; border:2px solid var(--ink); background:var(--wash); position:relative; overflow:hidden; pointer-events:auto; cursor:pointer}
 .pip video,.pip canvas{position:absolute; inset:0; width:100%; height:100%; object-fit:cover}
 .pip video.mirror{transform:scaleX(-1)}
 .pip .tag{position:absolute; left:0; right:0; bottom:0; background:var(--ink); color:var(--paper); font-family:var(--mono); font-size:10px; padding:2px 5px; display:flex; justify-content:space-between}
@@ -298,12 +298,6 @@ kbd{font-family:var(--mono); font-size:11px; border:1px solid var(--ink); paddin
 }
 .srow input[type=range]::-moz-range-track{height:8px; background:var(--wash); border:1px solid var(--ink)}
 .srow input[type=range]::-moz-range-thumb{width:14px; height:20px; background:var(--yellow); border:2px solid var(--ink); border-radius:0}
-.fing{display:flex; gap:3px}
-.fing i{
-  width:16px; height:22px; border:1px solid var(--rule); background:var(--paper);
-  font-family:var(--mono); font-size:9px; font-style:normal; display:grid; place-items:center; color:var(--grey);
-}
-.fing i.up{background:var(--yellow); border-color:var(--ink); color:var(--ink)}
 .auth-form{display:grid; gap:10px; max-width:340px; width:100%}
 .auth-form input{
   font-family:var(--mono); font-size:14px; padding:10px 11px;
@@ -429,10 +423,6 @@ kbd{font-family:var(--mono); font-size:11px; border:1px solid var(--ink); paddin
           <div class="row"><span>Tracking quality</span><span class="qbar" id="qbar"></span></div>
           <div class="row"><span>Current action</span><b id="rAct">&mdash;</b></div>
           <div class="row"><span>Punch speed</span><b id="rSpeed">&mdash;</b></div>
-          <div class="row"><span>Hand tracking</span><b id="rHands">LOADING</b></div>
-          <div class="row"><span>Face scan</span><b id="rFace">LOADING</b></div>
-          <div class="row"><span>Left hand</span><span class="fing" id="fingL"></span></div>
-          <div class="row"><span>Right hand</span><span class="fing" id="fingR"></span></div>
           <div class="row"><span>Face</span><b id="rFaceState">&mdash;</b></div>
 
           <div class="srow">
@@ -445,7 +435,6 @@ kbd{font-family:var(--mono); font-size:11px; border:1px solid var(--ink); paddin
             <input type="range" id="sPunch" min="0" max="1" step="0.01" value="0.62">
             <p class="note">Higher fires on a shorter jab. Lower needs a fuller extension.</p>
           </div>
-          <div class="row"><span>Track hands</span><span class="toggle on" id="tgHands"><i></i></span></div>
           <div class="row"><span>Track face</span><span class="toggle on" id="tgFace"><i></i></span></div>
           <span class="lbl" style="margin-top:4px">Try each move</span>
           <div id="gestList" style="display:grid; gap:4px"></div>
@@ -534,7 +523,7 @@ kbd{font-family:var(--mono); font-size:11px; border:1px solid var(--ink); paddin
             </div>
           </div>
           <div class="fhud-bot">
-            <div class="pip">
+            <div class="pip" id="pipBox" title="Tap to mirror the camera (M)">
               <video id="pipCam" class="mirror" playsinline muted></video>
               <canvas id="pipC"></canvas>
               <div class="tag"><span id="pipAct">&mdash;</span><span id="pipQ">&mdash;</span></div>
@@ -550,10 +539,11 @@ kbd{font-family:var(--mono); font-size:11px; border:1px solid var(--ink); paddin
           <h2 class="h-lg">Paused</h2>
           <div style="display:flex; gap:8px; flex-wrap:wrap; justify-content:center">
             <button class="btn primary" id="btnResume">Resume</button>
+            <button class="btn" id="btnPauseMirror">Mirror camera</button>
             <button class="btn" data-go="setup">Camera</button>
             <button class="btn quiet" data-go="title">Quit match</button>
           </div>
-          <p class="note">Esc resumes</p>
+          <p class="note">Esc resumes &middot; M mirrors the camera</p>
         </div>
       </div>
     </section>
@@ -875,19 +865,15 @@ const L = { NOSE:0, SHL:11, SHR:12, ELL:13, ELR:14, WRL:15, WRR:16,
             HIPL:23, HIPR:24, KNL:25, KNR:26, ANKL:27, ANKR:28 };
 const CDN = "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14";
 const MODEL = "https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/1/pose_landmarker_lite.task";
-const HAND_MODEL = "https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task";
-/* hand landmark indices: fingertip and the joint below it, per finger */
-const FINGERS = [[4,2],[8,6],[12,10],[16,14],[20,18]];
-const FINGER_NAMES = ["thumb","index","middle","ring","pinky"];
 
 const Pose = {
   ready:false, running:false, landmarker:null, stream:null,
   raw:null, sm:null, quality:0, fps:0, mirror:true, error:null,
   camFps:0, realFps:0, frames:0, fpsClock:0, useRvfc:false, inRvfc:false,
   cal:null, action:"—", lastSpeed:0,
-  hander:null, facer:null, handsOn:true, faceOn:true,
-  hands:{ L:null, R:null }, face:null, faceSeen:false, mouth:0, tilt:0,
-  handRaw:[], faceCenter:null, tick:0,
+  facer:null, faceOn:true,
+  face:null, faceSeen:false, mouth:0, tilt:0,
+  faceCenter:null, tick:0,
   vel:{ L:{x:0,y:0,v:0}, R:{x:0,y:0,v:0} },
   hold:{}, cooldown:{}, events:[], armed:{ L:true, R:true }
 };
@@ -944,18 +930,7 @@ async function startCamera(){
     }
     $("#rPose").textContent = "ACTIVE";
 
-    /* hands and face load after pose so the game is playable sooner */
-    (async () => {
-      try{
-        Pose.hander = await vision.HandLandmarker.createFromOptions(fileset, {
-          baseOptions:{ modelAssetPath: HAND_MODEL, delegate:"GPU" },
-          runningMode:"VIDEO", numHands:2,
-          minHandDetectionConfidence:.5, minTrackingConfidence:.5
-        });
-        setTxt("#rHands", "ACTIVE");
-      }catch(e){ setTxt("#rHands", "UNAVAILABLE"); Pose.handsOn = false; }
-      setTxt("#rFace", "FROM POSE");   /* no separate model needed */
-    })();
+    /* pose is the only model that loads now: one inference per frame */
     $("#camCta").classList.add("hide");
     toast("Camera live. Stand back until your hips are in frame, then Calibrate.");
     /* calibration now happens automatically as soon as you are in frame */
@@ -1062,8 +1037,6 @@ function recognize(dt){
   }
 
   /* posture booleans */
-  const handL = Pose.hands.L, handR = Pose.hands.R;
-  const palmsOpen = !!(handL && handL.open) && !!(handR && handR.open);
   const bothUp = s[L.WRL].y < nose.y && s[L.WRR].y < nose.y;
   const crouch = hp.y > cal.hipY + cal.torso * .28;
   const scale = dist(s[L.SHL], s[L.SHR]) / cal.shoulderW;   /* lean in => wider */
@@ -1077,7 +1050,7 @@ function recognize(dt){
   Input.posActive = true;
 
   /* open palms held up = guard; a fist is a committed strike */
-  Input.block = (bothUp && !cool("ult")) || (palmsOpen && bothUp);
+  Input.block = bothUp && !cool("ult");
   Input.crouch = crouch;
   Input.lean = clamp((scale - 1) * 2.4, -1, 1);
   Input.strafe = 0;
@@ -1107,8 +1080,7 @@ function recognize(dt){
         const headY = Pose.faceSeen && Pose.faceCenter
           ? Pose.faceCenter.y + Pose.faceCenter.h * .35 : nose.y + .04;
         const zone = wr.y < headY ? "HEAD" : wr.y < cal.hipY ? "BODY" : "LOW";
-        const hand = Pose.hands[side];
-        const heavy = !!(hand && hand.fist);           /* closed fist hits harder */
+        const heavy = ext > thresh + .10;              /* a fuller extension hits harder */
         Pose.events.push({ type:"PUNCH", side, speed:speedMs, zone, heavy });
         Pose.lastSpeed = speedMs;
         setCool(key, 240);
@@ -1128,7 +1100,7 @@ function recognize(dt){
 
   if(!Pose.actionUntil || now > Pose.actionUntil){
     const off = Input.posX - .5;
-    Pose.action = Input.block ? (palmsOpen ? "GUARD (PALMS)" : "BLOCK") :
+    Pose.action = Input.block ? "BLOCK" :
       crouch ? "CROUCH" :
       off < -.10 ? "MOVE LEFT" : off > .10 ? "MOVE RIGHT" :
       Input.lean > .3 ? "STEP IN" : Input.lean < -.3 ? "STEP BACK" : "GUARD";
@@ -1142,18 +1114,12 @@ function recognize(dt){
 
 /* --- per-frame pose tick --- */
 let lastVideoTime = -1, fpsAcc = 0, fpsN = 0;
-/* Body every frame; fingers and face are cosmetic/zone hints and can lag.
-   These back off automatically when the body rate drops. */
-let HAND_EVERY = 1;   /* the face model is gone, so fingers get every frame */
 let resDropped = false;
 function tuneBudget(){
   const f = Pose.realFps;
   if(!f) return;
   /* the body model is what drives the fighter; fingers and face are
      detail. Drop the detail first, and only then the picture size. */
-  Pose.handAuto = f >= 12;
-  /* face is free now; only the hand model can still be thinned out */
-  HAND_EVERY = f < 16 ? 3 : f < 24 ? 2 : 1;
 
   if(!resDropped && f < 22 && Pose.stream){
     resDropped = true;
@@ -1209,38 +1175,12 @@ function poseTick(dt){
 
   /* stagger the heavier models so they never starve pose tracking */
   Pose.tick++;
-  if(Pose.handsOn && Pose.handAuto !== false && Pose.hander && Pose.tick % HAND_EVERY === 0){
-    try{ readHands(Pose.hander.detectForVideo(v, t0 + 1)); }catch(e){}
-  }
+
   if(Pose.faceOn) readFaceFromPose();
 
 }
 function setTxt(sel, t){ const e = $(sel); if(e) e.textContent = t; }
 
-/* ---- fingers ---- */
-function readHands(res){
-  Pose.handRaw = (res && res.landmarks) || [];
-  const out = { L:null, R:null };
-  const names = (res && res.handedness) || [];
-  Pose.handRaw.forEach((lm, i) => {
-    const label = (names[i] && names[i][0] && names[i][0].categoryName) || (i ? "Right" : "Left");
-    const wrist = lm[0];
-    const up = [];
-    FINGERS.forEach(([tip, joint], fi) => {
-      const dTip = Math.hypot(lm[tip].x - wrist.x, lm[tip].y - wrist.y);
-      const dJoint = Math.hypot(lm[joint].x - wrist.x, lm[joint].y - wrist.y);
-      up.push(dTip > dJoint * (fi === 0 ? 1.18 : 1.12));
-    });
-    const count = up.filter(Boolean).length;
-    /* person-side, matching the pose landmarks: MediaPipe "Left" is your
-       left hand. Mirroring is applied once, at draw time, not here. */
-    const side = label === "Left" ? "L" : "R";
-    out[side] = { count, up, open: count >= 4, fist: count <= 1,
-                  x:wrist.x, y:wrist.y,
-                  named: FINGER_NAMES.filter((n, k) => up[k]) };
-  });
-  Pose.hands = out;
-}
 
 /* ---- face ---- */
 /* MediaPipe Pose already returns the face: nose, both eyes, both ears
@@ -1283,6 +1223,7 @@ addEventListener("keydown", e => {
   if(GAME_KEYS.indexOf(k) >= 0) e.preventDefault();
   if(keyState[k]) return;                       /* ignore auto-repeat */
   keyState[k] = true;
+  if(k === "m"){ toggleMirror(); return; }      /* usable on any screen */
   if(Screen.now !== "fight" || Match.paused) return;
   const zone = keyState["arrowup"] ? "HEAD" : (keyState["c"] ? "LOW" : "BODY");
   if(k === "a") Input.events.push({ type:"PUNCH", side:"L", speed:2.6, zone });
@@ -1790,10 +1731,8 @@ function netTick(now){
   const live = (Pose.running && Pose.cal) ? liveRig() : null;
   const packed = live ? Object.keys(live).map(k => [Math.round(live[k][0]*100)/100,
                                                     Math.round(live[k][1]*100)/100]) : null;
-  const fingers = h => h ? h.up.map(u => u ? 1 : 0) : null;
   netSend({ t:"s", x:PL.x, a:PL.anim, at:PL.animT, hp:PL.hp, st:PL.st,
-            ko:PL.ko, r:packed,
-            hl:fingers(Pose.hands.L), hr:fingers(Pose.hands.R) });
+            ko:PL.ko, r:packed });
 }
 /* REST is declared further down, so resolve the key order on first use */
 let _rigKeys = null;
@@ -1809,9 +1748,6 @@ function applyRemote(){
     rigKeys().forEach((k,i) => { if(m.r[i]) r[k] = [m.r[i][0], m.r[i][1]]; });
     OP.netRig = r;
   } else OP.netRig = null;
-  const unpack = f => f ? { up:f.map(Boolean), count:f.filter(Boolean).length,
-                            fist:f.filter(Boolean).length <= 1 } : null;
-  OP.handL = unpack(m.hl); OP.handR = unpack(m.hr);
 }
 function endOnline(won, why){
   Match.on = false;
@@ -2026,28 +1962,9 @@ function limb(c, A, B, w, fill, ol){
   c.strokeStyle = fill; c.lineWidth = w;
   c.beginPath(); c.moveTo(A[0], A[1]); c.lineTo(B[0], B[1]); c.stroke();
 }
-/* a hand: palm plus five fingers, curled or extended from live tracking */
-function drawHand(c, elbow, wrist, unit, hand, ol){
-  const ang = Math.atan2(wrist[1] - elbow[1], wrist[0] - elbow[0]);
-  const pr = unit * .135;
-  const up = hand ? hand.up : null;
-  const SPREAD = [-.78, -.32, -.06, .20, .46];   /* thumb first, then index..pinky */
-  const LEN    = [ .95,  1.35,  1.45, 1.32, 1.10];
-  for(let i = 0; i < 5; i++){
-    const extended = up ? up[i] : false;         /* no tracking reads as a fist */
-    const a = ang + SPREAD[i];
-    const len = pr * (extended ? LEN[i] : .48);
-    const bx = wrist[0] + Math.cos(a) * pr * .55;
-    const by = wrist[1] + Math.sin(a) * pr * .55;
-    const tx = wrist[0] + Math.cos(a) * (pr * .55 + len);
-    const ty = wrist[1] + Math.sin(a) * (pr * .55 + len);
-    c.lineCap = "round";
-    c.strokeStyle = "#000"; c.lineWidth = unit * .075 + ol * 2;
-    c.beginPath(); c.moveTo(bx, by); c.lineTo(tx, ty); c.stroke();
-    c.strokeStyle = "#FFC800"; c.lineWidth = unit * .075;
-    c.beginPath(); c.moveTo(bx, by); c.lineTo(tx, ty); c.stroke();
-  }
-  c.beginPath(); c.arc(wrist[0], wrist[1], pr, 0, 7);
+/* a boxing glove at the wrist */
+function drawGlove(c, wrist, unit, ol){
+  c.beginPath(); c.arc(wrist[0], wrist[1], unit * .17, 0, 7);
   c.fillStyle = "#FFC800"; c.fill();
   c.lineWidth = ol * 2; c.strokeStyle = "#000"; c.stroke();
 }
@@ -2167,7 +2084,7 @@ function drawCharacter(c, rig, cx, groundY, unit, facing, opts){
   /* back arm */
   limb(c, P2("shR"), P2("elR"), unit * .145, GY, ol);
   limb(c, P2("elR"), P2("wrR"), unit * .125, GY, ol);
-  drawHand(c, P2("elR"), P2("wrR"), unit * .92, opts.handR, ol);
+  drawGlove(c, P2("wrR"), unit * .92, ol);
 
   /* head */
   const hd = P2("nose"), hr = unit * .23;
@@ -2250,7 +2167,7 @@ function drawCharacter(c, rig, cx, groundY, unit, facing, opts){
   /* front arm on top */
   limb(c, P2("shL"), P2("elL"), unit * .155, WH, ol);
   limb(c, P2("elL"), P2("wrL"), unit * .135, WH, ol);
-  drawHand(c, P2("elL"), P2("wrL"), unit, opts.handL, ol);
+  drawGlove(c, P2("wrL"), unit, ol);
 
   c.restore();
 }
@@ -2275,9 +2192,8 @@ function drawSelectPreview(t){
   previewGhost.walk = t * 2;
   const tracked = Pose.running && Pose.cal;
   const live = tracked ? liveRig() : null;
-  const hands = (Pose.running && Pose.handsOn) ? Pose.hands : { L:null, R:null };
   drawCharacter(c, live || animRig(previewGhost, t), w / 2, groundY, unit, 1,
-    { id:f.id, handL:hands.L, handR:hands.R });
+    { id:f.id });
   const tag = $("#selTag");
   tag.textContent = tracked ? "LIVE — YOUR MOVEMENT" : (Pose.running ? "CALIBRATING" : "IDLE");
   tag.classList.toggle("on", !!tracked);
@@ -2317,14 +2233,13 @@ function drawArena(t){
   c.strokeRect(px, groundY + 3, ox - px, 8);
 
   const live = (Pose.running && Pose.cal && !PL.ko && !PL.win) ? liveRig() : null;
-  const liveHands = (Pose.running && Pose.handsOn) ? Pose.hands : { L:null, R:null };
   drawCharacter(c, live || animRig(PL, t), px, groundY, unit, PL.facing,
     { id:PL.f.id, glow: PL.animT > .1, koT: PL.koT,
-      handL: liveHands.L, handR: liveHands.R });
+      });
   const oRig = (Match.online && OP.netRig && !OP.ko) ? OP.netRig : animRig(OP, t);
   drawCharacter(c, oRig, ox, groundY, unit, OP.facing,
     { id:OP.f.id, glow: OP.animT > .1, koT: OP.koT,
-      handL: OP.handL || null, handR: OP.handR || null });
+      });
 
   hitFx.forEach(f => {
     const r = unit * (f.big ? .95 : .6) * (1 - f.life / .22);
@@ -2398,19 +2313,6 @@ function drawOverlay(cv){
     }
   }
 
-  /* hands: bones plus a fingertip dot per extended finger */
-  const HB = [[0,1],[1,2],[2,3],[3,4],[0,5],[5,6],[6,7],[7,8],[5,9],[9,10],[10,11],[11,12],
-              [9,13],[13,14],[14,15],[15,16],[13,17],[17,18],[18,19],[19,20],[0,17]];
-  (Pose.handRaw || []).forEach(lm => {
-    const hp2 = new Path2D();
-    HB.forEach(([a, bx]) => { hp2.moveTo(X(lm[a].x), Y(lm[a].y)); hp2.lineTo(X(lm[bx].x), Y(lm[bx].y)); });
-    c.strokeStyle = "#FFC800"; c.lineWidth = 6; c.stroke(hp2);
-    c.strokeStyle = "#000"; c.lineWidth = 2; c.stroke(hp2);
-    FINGERS.forEach(([tip]) => {
-      c.beginPath(); c.arc(X(lm[tip].x), Y(lm[tip].y), 4, 0, 7);
-      c.fillStyle = "#FFC800"; c.fill(); c.lineWidth = 2; c.strokeStyle = "#000"; c.stroke();
-    });
-  });
 }
 
 /* ============================================================
@@ -2458,21 +2360,26 @@ function bindSlider(sel, out, key){
 }
 bindSlider("#sMove", "#vMove", "sensitivity");
 bindSlider("#sPunch", "#vPunch", "punchSens");
-$("#tgHands").addEventListener("click", () => {
-  Pose.handsOn = $("#tgHands").classList.toggle("on");
-  if(!Pose.handsOn){ Pose.hands = { L:null, R:null }; Pose.handRaw = []; }
-});
 $("#tgFace").addEventListener("click", () => {
   Pose.faceOn = $("#tgFace").classList.toggle("on");
   if(!Pose.faceOn){ Pose.faceCenter = null; Pose.faceSeen = false; }
 });
-$("#btnMirror").addEventListener("click", () => {
-  Pose.mirror = !Pose.mirror;
-  applyMirror(); P.mirror = Pose.mirror; save();
-});
+$("#btnMirror").addEventListener("click", toggleMirror);
+$("#btnPauseMirror").addEventListener("click", toggleMirror);
+$("#pipBox").addEventListener("click", toggleMirror);
 function applyMirror(){
   $("#cam").classList.toggle("mirror", Pose.mirror);
   $("#pipCam").classList.toggle("mirror", Pose.mirror);
+}
+/* Mirroring was reachable only from the setup screen, so once a fight
+   started there was no way to flip it. It can now be toggled anywhere:
+   the M key, the pause menu, or tapping the camera pane in the HUD. */
+function toggleMirror(){
+  Pose.mirror = !Pose.mirror;
+  applyMirror();
+  rigPrev = null;                 /* don't interpolate across the flip */
+  P.mirror = Pose.mirror; save();
+  toast(Pose.mirror ? "Camera mirrored." : "Camera un-mirrored.");
 }
 $("#btnFight").addEventListener("click", () => startMatch(false, false));
 const startTraining = () => {
@@ -2657,13 +2564,6 @@ function paintSetup(){
   ba.textContent = act;
   ba.classList.toggle("show", Pose.running && act !== "GUARD" && act !== "—");
 
-  ["L","R"].forEach(side => {
-    const el = $("#fing" + side), hnd = Pose.hands[side];
-    if(!el) return;
-    el.innerHTML = FINGER_NAMES.map((n, i) =>
-      '<i class="' + (hnd && hnd.up[i] ? "up" : "") + '">' + n.charAt(0).toUpperCase() + "</i>").join("") +
-      '<i class="' + (hnd && hnd.fist ? "up" : "") + '" title="fist">' + (hnd ? hnd.count : "-") + "</i>";
-  });
   const fs = $("#rFaceState");
   if(fs) fs.textContent = !Pose.faceOn ? "OFF" : Pose.faceSeen
     ? ("SEEN · MOUTH " + Math.round(Pose.mouth * 100) + "%") : "NO FACE";
