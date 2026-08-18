@@ -842,6 +842,23 @@ const FIGHTERS = [
     sp:"SLACK LINE", spd:"Swings in on a rigging line for a strike that lands from well outside normal range.",
     unlock:{ type:"level", cost:12 } }
 ];
+/* Signature moves. Every fighter's ultimate behaves differently, driven
+   by data rather than twelve bespoke branches, so a thirteenth fighter is
+   still just one more row in the roster. */
+const ULTS = {
+  RIVET:   { hits:1, dmg:2.6, launch:1, self:0,   stun:.5,  zone:"BODY", say:"TORCH LINE" },
+  KESTREL: { hits:2, dmg:1.2, launch:1, self:3.4, stun:.2,  zone:"HEAD", say:"FREEFALL" },
+  PANEL:   { hits:3, dmg:.85, launch:0, self:0,   stun:.3,  zone:"BODY", say:"WHOLE CAR" },
+  MAYDAY:  { hits:1, dmg:2.2, launch:0, self:0,   stun:.8,  zone:"BODY", heal:18, say:"FLATLINE" },
+  SLAB:    { hits:1, dmg:2.4, launch:1, self:0,   stun:.7,  zone:"LOW",  quake:1, say:"LOAD BEARING" },
+  FUSEBOX: { hits:4, dmg:.7,  launch:0, self:0,   stun:1.1, zone:"BODY", say:"DEAD SHORT" },
+  MORTAR:  { hits:1, dmg:2.0, launch:0, self:0,   stun:.4,  zone:"BODY", armor:2.5, say:"DEAD WEIGHT" },
+  JITNEY:  { hits:2, dmg:1.1, launch:0, self:0,   stun:.3,  zone:"BODY", dash:1, say:"CURBSIDE" },
+  BRINE:   { hits:1, dmg:1.8, launch:1, self:0,   stun:1.4, zone:"BODY", say:"COLD STORAGE" },
+  TALLY:   { hits:1, dmg:1.4, launch:0, self:0,   stun:.4,  zone:"HEAD", scale:1, say:"LAST CALL" },
+  GRIDDLE: { hits:6, dmg:.55, launch:0, self:0,   stun:.2,  zone:"BODY", say:"FULL SEAR" },
+  HALYARD: { hits:1, dmg:2.3, launch:1, self:2.2, stun:.5,  zone:"HEAD", reach:.14, say:"SLACK LINE" }
+};
 const byId = id => FIGHTERS.find(f => f.id === id) || FIGHTERS[0];
 const statOf = (f,k) => f.stats[STAT_KEYS.indexOf(k)];
 function isOwned(f){ return P.owned.indexOf(f.id) >= 0; }
@@ -1049,7 +1066,30 @@ function recognize(dt){
   Input.posX = clamp(.5 + (rawX - centerX) * gain, ARENA.left, ARENA.right);
   Input.posActive = true;
 
-  /* open palms held up = guard; a fist is a committed strike */
+  /* JUMP — dip your knees then stand up fast. Your feet never leave the
+     floor, so nothing drops out of frame, but the fighter launches far
+     past anything a person could manage. */
+  const hipRise = (cal.hipY - hp.y) / Math.max(dt, .001);
+  if(crouch) Pose.crouchArmed = .45;
+  Pose.crouchArmed = Math.max(0, (Pose.crouchArmed || 0) - dt);
+  if(Pose.crouchArmed > 0 && !crouch && hipRise > cal.torso * 1.3 && !cool("jump")){
+    Pose.events.push({ type:"JUMP", power: clamp(hipRise / (cal.torso * 3), .75, 1.5) });
+    setCool("jump", 520); Pose.crouchArmed = 0;
+    Pose.action = "JUMP"; Pose.actionUntil = now + 420;
+  }
+
+  /* SIDE KICK — shoulders thrown out sideways over your hips. This is a
+     lean, not a step, so it never fights the position tracking that moves
+     your fighter left and right. */
+  const leanSide = (Pose.mirror ? -1 : 1) * (sh.x - hp.x) / cal.shoulderW;
+  if(Math.abs(leanSide) < .22) Pose.kickArmed = true;
+  if(Math.abs(leanSide) > .48 && Pose.kickArmed && !cool("kick")){
+    Pose.kickArmed = false; setCool("kick", 600);
+    Pose.events.push({ type:"KICK", dir: leanSide > 0 ? 1 : -1,
+                       speed: clamp(Math.abs(leanSide) * 5.5, 1.6, 4.6) });
+    Pose.action = "SIDE KICK"; Pose.actionUntil = now + 420;
+  }
+
   Input.block = bothUp && !cool("ult");
   Input.crouch = crouch;
   Input.lean = clamp((scale - 1) * 2.4, -1, 1);
@@ -1216,7 +1256,7 @@ const Input = { block:false, crouch:false, lean:0, strafe:0, posX:.5, posActive:
    permission, a dead webcam or a bad light level never leaves the game
    unplayable — the camera is the good way in, not the only one. */
 const keyState = {};
-const GAME_KEYS = ["w","a","s","d","x","q","e","c","r","shift","arrowup","arrowdown"];
+const GAME_KEYS = ["w","a","s","d","x","q","e","c","r","k"," ","shift","arrowup","arrowdown"];
 addEventListener("keydown", e => {
   if(e.target.matches("input,textarea")) return;
   const k = e.key.toLowerCase();
@@ -1230,6 +1270,8 @@ addEventListener("keydown", e => {
   if(k === "d") Input.events.push({ type:"PUNCH", side:"R", speed:2.6, zone });
   if(k === "s") Input.events.push({ type:"PUNCH", side:"R", speed:3.6, zone:"HEAD", heavy:true });
   if(k === "r") Input.events.push({ type:"ULT" });
+  if(k === " ") Input.events.push({ type:"JUMP", power:1 });
+  if(k === "k") Input.events.push({ type:"KICK", dir:1, speed:2.8 });
 });
 addEventListener("keyup", e => { keyState[e.key.toLowerCase()] = false; });
 function pollKeyboard(){
@@ -1262,6 +1304,15 @@ function drainEvents(){
    5. MATCH — fighters, range, damage, rounds, bot AI
    ============================================================ */
 const ARENA = { left:.12, right:.88 };
+const GRAVITY = 9.0;          /* rig units per second squared */
+const JUMP_V  = 4.2;          /* a launch far past what a person can do */
+
+/* --- anime spectacle: hitstop, slow motion and camera shake --- */
+const Cam = { shake:0, freeze:0, slow:1, slowT:0, flash:0 };
+function shake(a){ Cam.shake = Math.min(1.4, Cam.shake + a); }
+function freeze(t){ Cam.freeze = Math.max(Cam.freeze, t); }   /* impact frames */
+function slowmo(t, rate){ Cam.slowT = Math.max(Cam.slowT, t); Cam.slow = rate || .28; }
+function flash(a){ Cam.flash = Math.max(Cam.flash, a); }
 const Match = {
   on:false, paused:false, round:1, wins:[0,0], timer:60,
   state:"countdown", stateT:3, combo:0, comboT:0,
@@ -1280,7 +1331,8 @@ function makeFighter(f, x, facing, isBot){
     power: statOf(f,"POWER"), defense: statOf(f,"DEFENSE"),
     anim:"GUARD", animT:0, stun:0, atkT:0, atkSide:"R",
     aiT:.8, aiMode:"approach",
-    vx:0, prevX:x, walk:0, ko:false, koT:0, win:false
+    vx:0, prevX:x, walk:0, ko:false, koT:0, win:false,
+    y:0, vy:0, grounded:true, kbx:0, air:0, armor:0
   };
 }
 function startMatch(online, training){
@@ -1355,8 +1407,8 @@ function fistFront(f, s, prog){
   return f.x + f.facing * (travel + FIST_R);
 }
 function fistInside(f, d, s, prog){
-  const y = ZONE_Y[s.zone] || .6;
-  if(y > BODY_TOP || y < BODY_LOW) return false;
+  const y = (ZONE_Y[s.zone] || .6) + f.y;                      /* rides with the attacker */
+  if(y > d.y + BODY_TOP || y < d.y + BODY_LOW) return false;   /* and must reach them */
   if(d.crouching && s.zone === "HEAD") return false;      /* sails overhead */
   const front = fistFront(f, s, prog);
   return f.facing > 0 ? front >= d.x - BODY_HW
@@ -1368,7 +1420,8 @@ function tryAttack(attacker, defender, ev){
   attacker.animT = .22; attacker.atkSide = ev.side;
   attacker.st = Math.max(0, attacker.st - (ev.heavy ? 14 : 8));
   const strike = { side:ev.side, zone:ev.zone, speed:ev.speed, heavy:!!ev.heavy,
-                   t:0, dur:.22, hit:false, dead:false };
+                   kick:!!ev.kick, launch:!!ev.launch, ult:!!ev.ult,
+                   t:0, dur: ev.kick ? .28 : .22, hit:false, dead:false };
   if(fistInside(attacker, defender, strike, 0)){
     strike.dead = true;                                   /* no room to swing */
     if(!attacker.isBot){
@@ -1377,6 +1430,32 @@ function tryAttack(attacker, defender, ev){
     }
   }
   attacker.strike = strike;
+}
+
+/* Runs a fighter's signature move: a burst of scheduled strikes plus
+   whatever else that fighter does — heal, armour, a dash, a quake, or
+   launching themselves into the air first. */
+function fireUlt(a, d){
+  const u = ULTS[a.f.id] || ULTS.RIVET;
+  callout(u.say, 1.2);
+  slowmo(.9, .35); shake(1.2); flash(1);
+  if(u.self){ a.vy = Math.max(a.vy, u.self); a.grounded = false; }
+  if(u.heal) a.hp = Math.min(a.maxHp, a.hp + u.heal);
+  if(u.armor) a.armor = u.armor;
+  if(u.dash) a.x = clamp(d.x - a.facing * (BODY_HW + .04), ARENA.left, ARENA.right);
+  if(u.quake){ d.vy = Math.max(d.vy, 2.8); d.grounded = false; shake(1.4); }
+  const mult = u.scale ? 1 + Math.min(Match.best, 12) * .08 : 1;
+  for(let i = 0; i < u.hits; i++){
+    setTimeout(() => {
+      if(!Match.on || a.hp <= 0 || d.hp <= 0) return;
+      a.reach += (u.reach || 0);
+      tryAttack(a, d, { side: i % 2 ? "L" : "R", zone:u.zone,
+                        speed: 3.0 + u.dmg * mult, heavy:true,
+                        launch: !!u.launch && i === 0, ult:true });
+      a.reach -= (u.reach || 0);
+      if(u.stun) d.stun = Math.max(d.stun, u.stun);
+    }, i * 110);
+  }
 }
 
 function stepStrike(attacker, defender, dt){
@@ -1402,7 +1481,8 @@ function applyHit(attacker, defender, ev){
   const zoneF = ZONES[ev.zone] || 1;
   const stF = attacker.st < 15 ? .5 : 1;
   const defF = 1 - (defender.defense / 100) * .30;
-  const blockF = defender.blocking ? .2 : 1;
+  let blockF = defender.blocking ? .2 : 1;
+  if(defender.armor > 0){ blockF *= .45; defender.armor -= 1; }
   let dmg = 9 * speedF * zoneF * (attacker.power / 70) * defF * blockF * stF;
   dmg = Math.max(1, Math.round(dmg));
 
@@ -1415,6 +1495,23 @@ function applyHit(attacker, defender, ev){
   if(Match.online && attacker === PL) netSend({ t:"h", d:dmg, z:ev.zone, s:ev.speed });
 
   const crit = ev.zone === "HEAD" && speedF > 1.5 && ev.speed > 3.4;
+
+  /* --- the anime payload: launch, knockback, and frozen frames --- */
+  const launcher = !!ev.kick || !!ev.launch;
+  if(!defender.blocking){
+    defender.kbx += attacker.facing *
+      (launcher ? .95 : .18 + speedF * .22) * (ev.heavy ? 1.5 : 1);
+    if(launcher || (crit && defender.grounded)){
+      defender.vy = Math.max(defender.vy, launcher ? 3.6 : 2.4);
+      defender.grounded = false;
+    }else if(!defender.grounded){
+      defender.vy = Math.max(defender.vy, 1.2);                /* keep the juggle alive */
+    }
+  }
+  if(crit){ freeze(.13); slowmo(.5, .25); shake(1.2); flash(.9); }
+  else if(ev.heavy || launcher){ freeze(.07); shake(.75); flash(.4); }
+  else { freeze(.03); shake(.3); }
+
   dmgFx.push({ x:defender.x, y:.42, v:dmg, life:.9, crit, zone:ev.zone,
                jx:(Math.random()-.5)*.06, jy:Math.random()*.55 });
   hitFx.push({ x:defender.x, y:.45, life:.22, big:crit });
@@ -1510,6 +1607,7 @@ function botThink(dt){
 
   const r = Math.random();
   if(b.hp < b.maxHp * .3 && r < .3 * skill){ b.aiMode = "retreat"; b.aiT = .7; }
+  else if(b.sp >= 100 && r < .5 * skill){ b.sp = 0; fireUlt(b, p); b.aiT = 1.2; }
   else if(gap <= b.reach && r < .75 * skill){
     b.aiMode = "attack"; b.aiT = lerp(1.0, .45, skill);
     const zone = r < .3 ? "HEAD" : r < .8 ? "BODY" : "LOW";
@@ -1551,6 +1649,13 @@ function separate(){
 /* --- match tick --- */
 function matchTick(dt){
   if(!Match.on || Match.paused) return;
+  /* Impact frames: hold the whole world still for a few frames on a big
+     hit. Freezing time is what sells the weight of it. */
+  Cam.shake = Math.max(0, Cam.shake - dt * 3.2);
+  Cam.flash = Math.max(0, Cam.flash - dt * 4.5);
+  if(Cam.freeze > 0){ Cam.freeze -= dt; return; }
+  if(Cam.slowT > 0){ Cam.slowT -= dt; dt *= Cam.slow; }
+  else Cam.slow = 1;
   if(Match.calloutT > 0){
     Match.calloutT -= dt;
     if(Match.calloutT <= 0) $("#callout").classList.remove("show");
@@ -1589,11 +1694,24 @@ function matchTick(dt){
       if(PL.st < 6){ logHit("NO STAMINA", ""); return; }
       tryAttack(PL, OP, ev);
     }
+    if(ev.type === "JUMP"){
+      if(PL.grounded){
+        PL.vy = JUMP_V * (ev.power || 1);
+        PL.grounded = false; PL.air = 0;
+        PL.anim = "JUMP"; PL.animT = .3;
+      }
+      return;
+    }
+    if(ev.type === "KICK"){
+      if(PL.st < 10){ logHit("NO STAMINA", ""); return; }
+      tryAttack(PL, OP, { side:"R", zone: PL.y > .5 ? "HEAD" : "BODY",
+                          speed:ev.speed, heavy:true, kick:true });
+      return;
+    }
     if(ev.type === "ULT"){
       if(PL.sp < 100){ logHit("ULTIMATE NOT READY", Math.round(PL.sp) + "%"); return; }
       PL.sp = 0;
-      tryAttack(PL, OP, { type:"PUNCH", side:"R", speed:4.2, zone:"HEAD", heavy:true });
-      callout(PL.f.sp, 1);
+      fireUlt(PL, OP);
     }
   });
 
@@ -1603,6 +1721,28 @@ function matchTick(dt){
   stepStrike(OP, PL, dt);
 
   [PL, OP].forEach(ft => {
+    /* --- vertical axis: everything airborne rides on this --- */
+    if(!ft.grounded || ft.vy > 0){
+      ft.vy -= GRAVITY * dt;
+      ft.y += ft.vy * dt;
+      if(ft.y <= 0){
+        ft.y = 0; ft.vy = 0;
+        if(!ft.grounded){ ft.grounded = true; ft.air = 0; shake(.35); }
+      }else ft.grounded = false;
+    }
+    /* --- knockback slides you across the arena and off the walls --- */
+    if(Math.abs(ft.kbx) > .0005){
+      ft.x += ft.kbx * dt;
+      ft.kbx *= Math.pow(ft.grounded ? .02 : .35, dt);
+      if(ft.x <= ARENA.left || ft.x >= ARENA.right){
+        ft.x = clamp(ft.x, ARENA.left, ARENA.right);
+        if(Math.abs(ft.kbx) > .35){          /* wall bounce */
+          ft.kbx *= -.55; ft.vy = Math.max(ft.vy, 1.6);
+          ft.grounded = false; shake(1); freeze(.06);
+          callout("WALL BOUNCE", .5);
+        }else ft.kbx = 0;
+      }
+    }else ft.kbx = 0;
     ft.st = Math.min(100, ft.st + dt * 16);
     ft.stun = Math.max(0, ft.stun - dt);
     ft.animT = Math.max(0, ft.animT - dt);
@@ -1925,6 +2065,13 @@ function animRig(ft, t){
   ["elL","elR","wrL","wrR"].forEach(j => r[j][1] += br * .6);
 
   /* walk cycle scales with how fast the fighter is actually moving */
+  if(!ft.grounded && ft.y > .05){          /* tuck in the air */
+    r.knL = [-.34,.34]; r.knR = [.34,.34];
+    r.anL = [-.40,.86]; r.anR = [.40,.86];
+    r.elL = [-.62,-.62]; r.elR = [.62,-.62];
+    r.wrL = [-.30,-1.06]; r.wrR = [.30,-1.06];
+    return r;
+  }
   const gait = clamp(Math.abs(ft.vx) * 9, 0, 1);
   if(gait > .02){
     const sw = Math.sin(ft.walk) * gait;
@@ -2224,6 +2371,11 @@ function drawArena(t){
     c.beginPath(); c.moveTo(x, groundY); c.lineTo(x, groundY + h * .05); c.stroke();
   }
   if(!PL) return;
+  if(Cam.shake > 0){
+    c.save();
+    c.translate((Math.random()-.5) * Cam.shake * unit * .35,
+                (Math.random()-.5) * Cam.shake * unit * .28);
+  }
   const px = X(PL.x), ox = X(OP.x);
   /* reach band on the floor, so distance is legible at a glance */
   const inR = Math.abs(PL.x - OP.x) <= PL.reach;
@@ -2232,14 +2384,21 @@ function drawArena(t){
   c.strokeStyle = "#000"; c.lineWidth = 1;
   c.strokeRect(px, groundY + 3, ox - px, 8);
 
+  /* airborne fighters cast a smaller, fainter shadow on the floor */
+  [[px, PL], [ox, OP]].forEach(([sx, ft]) => {
+    if(ft.y <= .02) return;
+    const k = clamp(1 - ft.y / 3.2, .25, 1);
+    c.fillStyle = "#D8D8D8";
+    c.beginPath();
+    c.ellipse(sx, groundY + unit * .04, unit * .52 * k, unit * .085 * k, 0, 0, 7);
+    c.fill();
+  });
   const live = (Pose.running && Pose.cal && !PL.ko && !PL.win) ? liveRig() : null;
-  drawCharacter(c, live || animRig(PL, t), px, groundY, unit, PL.facing,
-    { id:PL.f.id, glow: PL.animT > .1, koT: PL.koT,
-      });
+  drawCharacter(c, live || animRig(PL, t), px, groundY - PL.y * unit, unit, PL.facing,
+    { id:PL.f.id, glow: PL.animT > .1, koT: PL.koT, air: PL.y > .05 });
   const oRig = (Match.online && OP.netRig && !OP.ko) ? OP.netRig : animRig(OP, t);
-  drawCharacter(c, oRig, ox, groundY, unit, OP.facing,
-    { id:OP.f.id, glow: OP.animT > .1, koT: OP.koT,
-      });
+  drawCharacter(c, oRig, ox, groundY - OP.y * unit, unit, OP.facing,
+    { id:OP.f.id, glow: OP.animT > .1, koT: OP.koT, air: OP.y > .05 });
 
   hitFx.forEach(f => {
     const r = unit * (f.big ? .95 : .6) * (1 - f.life / .22);
@@ -2265,6 +2424,11 @@ function drawArena(t){
     c.globalAlpha = 1;
   });
   c.textAlign = "start";
+  if(Cam.shake > 0) c.restore();
+  if(Cam.flash > 0){
+    c.fillStyle = "rgba(255,200,0," + (Cam.flash * .5).toFixed(3) + ")";
+    c.fillRect(0, 0, w, h);
+  }
 }
 
 /* skeleton overlay on the camera feed */
