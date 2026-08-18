@@ -157,6 +157,15 @@ h1,h2,h3{margin:0; letter-spacing:-.01em}
 .ftile .s{font-family:var(--mono); font-size:10px; color:var(--grey); text-transform:uppercase}
 .ftile.sel .s{color:var(--ink)}
 .ftile .lk{position:absolute; top:8px; right:8px; font-family:var(--mono); font-size:9px; color:var(--grey)}
+.sel-preview{
+  flex:1; min-height:170px; border:1px solid var(--rule); position:relative; overflow:hidden;
+}
+.sel-preview canvas{position:absolute; inset:0; width:100%; height:100%}
+.sel-preview .tag{position:absolute; left:8px; top:8px}
+.sel-preview .hint{
+  position:absolute; right:8px; bottom:8px; font-family:var(--mono);
+  font-size:10px; letter-spacing:.08em; text-transform:uppercase; color:var(--grey);
+}
 .sel-side{border-left:1px solid var(--ink); padding:16px; display:flex; flex-direction:column; gap:10px; overflow:auto}
 .statline{display:grid; grid-template-columns:78px 1fr 30px; align-items:center; gap:8px}
 .statline span{font-family:var(--mono); font-size:10px; color:var(--grey); text-transform:uppercase}
@@ -361,6 +370,7 @@ kbd{font-family:var(--mono); font-size:11px; border:1px solid var(--ink); paddin
         </div>
         <div class="title-acts" style="margin-top:8px">
           <button class="btn quiet" data-go="select">Fighters</button>
+          <button class="btn quiet" id="btnTrain2">Training</button>
           <button class="btn quiet" data-go="shop">Shop</button>
           <button class="btn quiet" data-go="profile">Profile</button>
           <button class="btn quiet" id="btnHowto">How to play</button>
@@ -448,6 +458,11 @@ kbd{font-family:var(--mono); font-size:11px; border:1px solid var(--ink); paddin
             <span class="lbl" id="rosterCount"></span>
           </div>
           <div class="roster" id="roster"></div>
+          <div class="sel-preview">
+            <canvas id="selCanvas"></canvas>
+            <span class="pill tag" id="selTag">IDLE</span>
+            <span class="hint" id="selHint"></span>
+          </div>
           <div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:auto">
             <button class="btn quiet" data-go="title">Back</button>
             <button class="btn quiet" data-go="setup">Camera setup</button>
@@ -465,6 +480,7 @@ kbd{font-family:var(--mono); font-size:11px; border:1px solid var(--ink); paddin
             <span class="lbl">Difficulty</span>
             <div style="display:flex; gap:5px; flex-wrap:wrap" id="diffRow"></div>
             <button class="btn primary big" id="btnFight">Fight</button>
+            <button class="btn" id="btnTrain">Training</button>
             <p class="note" id="fightNote"></p>
             <button class="btn quiet" data-go="setup">Camera setup</button>
           </div>
@@ -510,6 +526,8 @@ kbd{font-family:var(--mono); font-size:11px; border:1px solid var(--ink); paddin
             <div class="hitlog" id="hitLog"></div>
           </div>
         </div>
+        <span class="pill" id="trainBadge"
+              style="position:absolute; left:12px; top:12px; display:none">TRAINING &middot; NOT SCORED</span>
         <div class="combo" id="comboBox"><b id="comboN">x0</b><span id="comboRate">COMBO</span></div>
         <div class="callout" id="callout"><em>FIGHT</em></div>
         <div class="pause" id="pauseBox">
@@ -639,6 +657,13 @@ kbd{font-family:var(--mono); font-size:11px; border:1px solid var(--ink); paddin
             <div class="kv"><span>Crouch</span><b>Drop your hips</b></div>
             <div class="kv"><span>Step in / back</span><b>Lean toward the camera</b></div>
             <div class="kv"><span>Ultimate</span><b>Both hands high, hold</b></div>
+            <div class="kv"><span>Punch left / right</span><b><kbd>A</kbd> <kbd>D</kbd></b></div>
+            <div class="kv"><span>Heavy (head)</span><b><kbd>S</kbd></b></div>
+            <div class="kv"><span>Aim high / low</span><b><kbd>&uarr;</kbd> <kbd>C</kbd></b></div>
+            <div class="kv"><span>Step in / back</span><b><kbd>W</kbd> <kbd>X</kbd></b></div>
+            <div class="kv"><span>Dodge left / right</span><b><kbd>Q</kbd> <kbd>E</kbd></b></div>
+            <div class="kv"><span>Block</span><b><kbd>Shift</kbd></b></div>
+            <div class="kv"><span>Ultimate</span><b><kbd>R</kbd></b></div>
             <div class="kv"><span>Pause</span><b><kbd>Esc</kbd></b></div>
             <p class="note">Damage needs range, hand speed and a good zone. Head hits pay most.</p>
           </div>
@@ -780,12 +805,13 @@ const FINGER_NAMES = ["thumb","index","middle","ring","pinky"];
 const Pose = {
   ready:false, running:false, landmarker:null, stream:null,
   raw:null, sm:null, quality:0, fps:0, mirror:true, error:null,
+  camFps:0, realFps:0, frames:0, fpsClock:0, useRvfc:false, inRvfc:false,
   cal:null, action:"—", lastSpeed:0,
   hander:null, facer:null, handsOn:true, faceOn:true,
   hands:{ L:null, R:null }, face:null, faceSeen:false, mouth:0, tilt:0,
   handRaw:[], faceRaw:null, faceCenter:null, tick:0,
   vel:{ L:{x:0,y:0,v:0}, R:{x:0,y:0,v:0} },
-  hold:{}, cooldown:{}, events:[]
+  hold:{}, cooldown:{}, events:[], armed:{ L:true, R:true }
 };
 
 async function startCamera(){
@@ -795,7 +821,11 @@ async function startCamera(){
       throw new Error("This browser blocks camera access on insecure pages. Open the game over https:// or http://localhost.");
     setPill($("#rCam"), "REQUESTING");
     Pose.stream = await navigator.mediaDevices.getUserMedia({
-      video:{ width:{ideal:640}, height:{ideal:480}, facingMode:"user" }, audio:false
+      /* Pose tracking does not need a sharp picture, it needs a fast one.
+         A smaller frame is far cheaper to run inference on, so we trade
+         resolution for detection rate. */
+      video:{ width:{ideal:480}, height:{ideal:360}, facingMode:"user",
+              frameRate:{ ideal:60 } }, audio:false
     });
     const v = $("#cam"), pv = $("#pipCam");
     v.srcObject = Pose.stream; await v.play();
@@ -805,7 +835,9 @@ async function startCamera(){
     $("#tCam").classList.add("on");
     const track = Pose.stream.getVideoTracks()[0];
     const st = track.getSettings ? track.getSettings() : {};
-    $("#oCam").textContent = (st.width||640) + "×" + (st.height||480);
+    Pose.camFps = Math.round(st.frameRate || 0);
+    $("#oCam").textContent = (st.width||640) + "×" + (st.height||480) +
+      (Pose.camFps ? " @" + Pose.camFps : "");
 
     $("#rPose").textContent = "LOADING";
     const vision = await import(CDN + "/vision_bundle.mjs");
@@ -816,6 +848,22 @@ async function startCamera(){
       minPoseDetectionConfidence:.5, minPosePresenceConfidence:.5, minTrackingConfidence:.5
     });
     Pose.ready = true; Pose.running = true; Pose.error = null;
+    /* Drive detection from the video frame callback where it exists: it
+       fires as each camera frame arrives instead of guessing on rAF, which
+       removes up to a frame of lag between your move and the fighter's. */
+    if(typeof v.requestVideoFrameCallback === "function"){
+      Pose.useRvfc = true;
+      let prev = performance.now();
+      const step = () => {
+        if(!Pose.running){ Pose.useRvfc = false; return; }
+        const t = performance.now();
+        const d = Math.min(.1, (t - prev) / 1000); prev = t;
+        Pose.inRvfc = true;
+        try{ poseTick(d); } finally { Pose.inRvfc = false; }
+        v.requestVideoFrameCallback(step);
+      };
+      v.requestVideoFrameCallback(step);
+    }
     $("#rPose").textContent = "ACTIVE";
 
     /* hands and face load after pose so the game is playable sooner */
@@ -859,7 +907,7 @@ function stopCamera(){
 /* --- smoothing: exponential filter per landmark --- */
 function smooth(lms){
   if(!Pose.sm){ Pose.sm = lms.map(p => ({x:p.x, y:p.y, v:p.visibility ?? 1})); return Pose.sm; }
-  const a = 0.55;
+  const a = 0.72;   /* follow the body faster; velocity is smoothed separately */
   for(let i = 0; i < lms.length; i++){
     const s = Pose.sm[i], p = lms[i];
     s.x = lerp(s.x, p.x, a); s.y = lerp(s.y, p.y, a);
@@ -906,9 +954,11 @@ function recognize(dt){
   for(const side of ["L","R"]){
     const w = side === "L" ? s[L.WRL] : s[L.WRR];
     const v = Pose.vel[side];
-    const dx = (w.x - v.x) / Math.max(dt, .001);
-    const dy = (w.y - v.y) / Math.max(dt, .001);
-    v.v = Math.hypot(dx, dy);
+    /* a tiny dt used to turn one jittery landmark into a huge "speed",
+       which is why light taps were landing as criticals */
+    const step = Math.max(dt, 1 / 90);
+    const raw = Math.hypot(w.x - v.x, w.y - v.y) / step;
+    v.v = v.v * .55 + Math.min(raw, 8) * .45;
     v.x = w.x; v.y = w.y;
   }
 
@@ -940,9 +990,20 @@ function recognize(dt){
     const ext = dist(wr, so) / cal.armLen;
     const key = "punch" + side;
     const thresh = .92 - P.punchSens * .28;            /* sensitivity slider */
-    if(ext > thresh && !cool(key) && !bothUp){
+    /* re-arm only once the arm is pulled back in, so holding it out
+       against the opponent cannot machine-gun damage */
+    if(ext < thresh - .16) Pose.armed[side] = true;
+    /* An occluded or out-of-frame arm still gets a guessed position, and
+       those guesses jump — which read as huge speed and fired phantom
+       punches while standing still. Require the model to actually see the
+       arm, and the wrist to be inside the frame, before it can count. */
+    const seen = wr.v > .65 && so.v > .55 &&
+                 wr.x > .02 && wr.x < .98 && wr.y > .02 && wr.y < .98;
+    if(!seen) Pose.armed[side] = false;
+    if(ext > thresh && seen && Pose.armed[side] && !cool(key) && !bothUp){
       const speedMs = Pose.vel[side].v * 1.7;          /* body-height scaled */
-      if(speedMs > .7){
+      if(speedMs > 1.15){                              /* a real thrust, not a drift */
+        Pose.armed[side] = false;
         /* the face scan gives a truer head line than the nose landmark alone */
         const headY = Pose.faceSeen && Pose.faceCenter
           ? Pose.faceCenter.y + Pose.faceCenter.h * .35 : nose.y + .04;
@@ -982,8 +1043,19 @@ function recognize(dt){
 
 /* --- per-frame pose tick --- */
 let lastVideoTime = -1, fpsAcc = 0, fpsN = 0;
+/* Body every frame; fingers and face are cosmetic/zone hints and can lag.
+   These back off automatically when the body rate drops. */
+let HAND_EVERY = 3, FACE_EVERY = 8;
+function tuneBudget(){
+  const f = Pose.realFps;
+  if(!f) return;
+  if(f < 18){ HAND_EVERY = 6; FACE_EVERY = 16; }
+  else if(f < 28){ HAND_EVERY = 4; FACE_EVERY = 12; }
+  else { HAND_EVERY = 3; FACE_EVERY = 8; }
+}
 function poseTick(dt){
   if(!Pose.running || !Pose.landmarker) return;
+  if(Pose.useRvfc && !Pose.inRvfc) return;   /* the video frame callback drives us */
   const v = $("#cam");
   if(v.readyState < 2) return;
   if(v.currentTime === lastVideoTime) return;
@@ -992,7 +1064,13 @@ function poseTick(dt){
   let res = null;
   try{ res = Pose.landmarker.detectForVideo(v, t0); }catch(e){ return; }
   fpsAcc += performance.now() - t0; fpsN++;
+  Pose.frames++;
   if(fpsN >= 20){ Pose.fps = Math.round(fpsAcc / fpsN); fpsAcc = 0; fpsN = 0; }
+  if(t0 - Pose.fpsClock >= 1000){
+    Pose.realFps = Math.round(Pose.frames * 1000 / (t0 - Pose.fpsClock));
+    Pose.frames = 0; Pose.fpsClock = t0;
+    tuneBudget();
+  }
   if(res && res.landmarks && res.landmarks.length){
     Pose.raw = res.landmarks[0];
     smooth(Pose.raw);
@@ -1015,10 +1093,10 @@ function poseTick(dt){
 
   /* stagger the heavier models so they never starve pose tracking */
   Pose.tick++;
-  if(Pose.handsOn && Pose.hander && Pose.tick % 2 === 0){
+  if(Pose.handsOn && Pose.hander && Pose.tick % HAND_EVERY === 0){
     try{ readHands(Pose.hander.detectForVideo(v, t0 + 1)); }catch(e){}
   }
-  if(Pose.faceOn && Pose.facer && Pose.tick % 3 === 0){
+  if(Pose.faceOn && Pose.facer && Pose.tick % FACE_EVERY === 0){
     try{ readFace(Pose.facer.detectForVideo(v, t0 + 2)); }catch(e){}
   }
 }
@@ -1039,8 +1117,9 @@ function readHands(res){
       up.push(dTip > dJoint * (fi === 0 ? 1.18 : 1.12));
     });
     const count = up.filter(Boolean).length;
-    /* the preview is mirrored, so MediaPipe's "Left" is the hand on your right */
-    const side = label === "Left" ? "R" : "L";
+    /* person-side, matching the pose landmarks: MediaPipe "Left" is your
+       left hand. Mirroring is applied once, at draw time, not here. */
+    const side = label === "Left" ? "L" : "R";
     out[side] = { count, up, open: count >= 4, fist: count <= 1,
                   x:wrist.x, y:wrist.y,
                   named: FINGER_NAMES.filter((n, k) => up[k]) };
@@ -1068,6 +1147,33 @@ function readFace(res){
 const Input = { block:false, crouch:false, lean:0, strafe:0, posX:.5, posActive:false, events:[] };
 /* Motion is the only control scheme. Esc still pauses, because that is a
    menu action rather than a way to fight. */
+/* Keyboard controls. These stay live at all times so a refused camera
+   permission, a dead webcam or a bad light level never leaves the game
+   unplayable — the camera is the good way in, not the only one. */
+const keyState = {};
+const GAME_KEYS = ["w","a","s","d","x","q","e","c","r","shift","arrowup","arrowdown"];
+addEventListener("keydown", e => {
+  if(e.target.matches("input,textarea")) return;
+  const k = e.key.toLowerCase();
+  if(GAME_KEYS.indexOf(k) >= 0) e.preventDefault();
+  if(keyState[k]) return;                       /* ignore auto-repeat */
+  keyState[k] = true;
+  if(Screen.now !== "fight" || Match.paused) return;
+  const zone = keyState["arrowup"] ? "HEAD" : (keyState["c"] ? "LOW" : "BODY");
+  if(k === "a") Input.events.push({ type:"PUNCH", side:"L", speed:2.6, zone });
+  if(k === "d") Input.events.push({ type:"PUNCH", side:"R", speed:2.6, zone });
+  if(k === "s") Input.events.push({ type:"PUNCH", side:"R", speed:3.6, zone:"HEAD", heavy:true });
+  if(k === "r") Input.events.push({ type:"ULT" });
+});
+addEventListener("keyup", e => { keyState[e.key.toLowerCase()] = false; });
+function pollKeyboard(){
+  if(Pose.running && Pose.cal) return;          /* tracking owns the stick */
+  Input.block  = !!keyState["shift"];
+  Input.crouch = !!keyState["c"];
+  Input.lean   = (keyState["w"] ? 1 : 0) - (keyState["x"] ? 1 : 0);
+  Input.strafe = (keyState["e"] ? 1 : 0) - (keyState["q"] ? 1 : 0);
+}
+
 addEventListener("keydown", e => {
   if(e.target.matches("input,textarea")) return;
   if(e.key === "Escape" && Screen.now === "fight" && !gateEl.classList.contains("on")){
@@ -1093,7 +1199,7 @@ const ARENA = { left:.12, right:.88 };
 const Match = {
   on:false, paused:false, round:1, wins:[0,0], timer:60,
   state:"countdown", stateT:3, combo:0, comboT:0,
-  best:0, fastest:0, hits:0, whiffs:0, log:[]
+  best:0, fastest:0, hits:0, whiffs:0, log:[], training:false
 };
 let PL = null, OP = null;
 const dmgFx = [], hitFx = [];
@@ -1111,8 +1217,10 @@ function makeFighter(f, x, facing, isBot){
     vx:0, prevX:x, walk:0, ko:false, koT:0, win:false
   };
 }
-function startMatch(online){
-  if(!canFight()){ toast(fightBlockReason()); go("setup"); return; }
+function startMatch(online, training){
+  Match.training = !!training;
+  if(!canFight() && !online && !training)
+    toast("No tracking — keyboard controls: A/D punch, W step in.");
   const me = byId(P.fighter);
   const pool = FIGHTERS.filter(f => f.id !== me.id);
   const foe = online ? byId(Net.remoteFighter) : pool[Math.floor(Math.random() * pool.length)];
@@ -1191,7 +1299,7 @@ function tryAttack(attacker, defender, ev){
   /* online: the attacker computes the hit, the defender applies it */
   if(Match.online && attacker === PL) netSend({ t:"h", d:dmg, z:ev.zone, s:ev.speed });
 
-  const crit = ev.zone === "HEAD" && speedF > 1.2;
+  const crit = ev.zone === "HEAD" && speedF > 1.5 && ev.speed > 3.4;
   dmgFx.push({ x:defender.x, y:.42, v:dmg, life:.9, crit, zone:ev.zone,
                jx:(Math.random()-.5)*.06, jy:Math.random()*.55 });
   hitFx.push({ x:defender.x, y:.45, life:.22, big:crit });
@@ -1213,6 +1321,16 @@ function tryAttack(attacker, defender, ev){
 }
 
 function endRound(playerWon){
+  if(Match.training){
+    /* nothing is at stake in training — patch everyone up and carry on */
+    PL.hp = PL.maxHp; OP.hp = OP.maxHp;
+    PL.st = 100; OP.st = 100;
+    PL.x = .32; OP.x = .68; PL.ko = OP.ko = false; PL.win = OP.win = false;
+    Match.combo = 0; Match.timer = 60;
+    callout(playerWon ? "DOWN — RESET" : "YOU WENT DOWN — RESET", 1.2);
+    logHit(playerWon ? "Opponent reset" : "You were knocked down", "");
+    return;
+  }
   Match.state = "ko"; Match.stateT = 2.2;
   Match.wins[playerWon ? 0 : 1]++;
   (playerWon ? OP : PL).ko = true;
@@ -1222,6 +1340,7 @@ function endRound(playerWon){
 }
 function endMatch(playerWon){
   Match.on = false;
+  if(Match.training){ go("select"); return; }   /* training is never scored */
   const base = playerWon ? 1 : 0;
   const diffMul = [.5, 1, 1.5, 2][P.diff] || 1;
   const xp = Math.round((playerWon ? 400 : 90) * diffMul);
@@ -1376,7 +1495,8 @@ function matchTick(dt){
   if(Match.comboT <= 0) Match.combo = 0;
   Match.timer -= dt;
   if(Match.timer <= 0){
-    if(Match.online) endOnline(PL.hp >= OP.hp);
+    if(Match.training) Match.timer = 60;        /* endless training clock */
+    else if(Match.online) endOnline(PL.hp >= OP.hp);
     else endRound(PL.hp >= OP.hp);
   }
 
@@ -1406,6 +1526,8 @@ function paintFightHud(){
   cb.classList.toggle("show", Match.combo >= 2);
   $("#comboN").textContent = "x" + Match.combo;
   $("#comboRate").textContent = Match.combo >= 8 ? "SAVAGE" : Match.combo >= 5 ? "PERFECT" : "COMBO";
+  const tb = $("#trainBadge");
+  if(tb) tb.style.display = Match.training ? "inline-flex" : "none";
   $("#pipAct").textContent = Pose.running ? Pose.action : "NO CAMERA";
   $("#pipQ").textContent = Pose.running ? Math.round(Pose.quality * 100) + "%" : "—";
 }
@@ -1485,8 +1607,10 @@ function netTick(now){
   const live = (Pose.running && Pose.cal) ? liveRig() : null;
   const packed = live ? Object.keys(live).map(k => [Math.round(live[k][0]*100)/100,
                                                     Math.round(live[k][1]*100)/100]) : null;
+  const fingers = h => h ? h.up.map(u => u ? 1 : 0) : null;
   netSend({ t:"s", x:PL.x, a:PL.anim, at:PL.animT, hp:PL.hp, st:PL.st,
-            ko:PL.ko, r:packed });
+            ko:PL.ko, r:packed,
+            hl:fingers(Pose.hands.L), hr:fingers(Pose.hands.R) });
 }
 /* REST is declared further down, so resolve the key order on first use */
 let _rigKeys = null;
@@ -1502,6 +1626,9 @@ function applyRemote(){
     rigKeys().forEach((k,i) => { if(m.r[i]) r[k] = [m.r[i][0], m.r[i][1]]; });
     OP.netRig = r;
   } else OP.netRig = null;
+  const unpack = f => f ? { up:f.map(Boolean), count:f.filter(Boolean).length,
+                            fist:f.filter(Boolean).length <= 1 } : null;
+  OP.handL = unpack(m.hl); OP.handR = unpack(m.hr);
 }
 function endOnline(won, why){
   Match.on = false;
@@ -1601,24 +1728,44 @@ const RIG_BONES = [["nose","neck"],["neck","shL"],["neck","shR"],["shL","elL"],[
   ["shR","elR"],["elR","wrR"],["neck","hip"],["hip","hpL"],["hip","hpR"],
   ["hpL","knL"],["knL","anL"],["hpR","knR"],["knR","anR"],["shL","hpL"],["shR","hpR"]];
 
+/* Bone lengths of the drawn character. The camera gives us angles;
+   we keep the character's own proportions so the arms track your motion
+   instead of inheriting however long your arms look on camera. */
+const BL = {};
+[["hip","neck"],["neck","nose"],["neck","shL"],["neck","shR"],
+ ["shL","elL"],["elL","wrL"],["shR","elR"],["elR","wrR"],
+ ["hip","hpL"],["hip","hpR"],["hpL","knL"],["knL","anL"],
+ ["hpR","knR"],["knR","anR"]].forEach(([a,b]) => {
+  BL[a + ">" + b] = Math.hypot(REST[a][0] - REST[b][0], REST[a][1] - REST[b][1]);
+});
+
 function liveRig(){
   const s = Pose.sm, cal = Pose.cal;
   if(!s || !cal) return null;
-  const sh = mid(s[L.SHL], s[L.SHR]), hp = mid(s[L.HIPL], s[L.HIPR]);
-  const sc = Math.max(.05, dist(sh, hp));
-  const map = (p) => [ (p.x - hp.x) / sc, (p.y - hp.y) / sc ];
-  return {
-    nose:map(s[L.NOSE]), neck:map(sh),
-    shL:map(s[L.SHL]), shR:map(s[L.SHR]),
-    elL:map(s[L.ELL]), elR:map(s[L.ELR]),
-    wrL:map(s[L.WRL]), wrR:map(s[L.WRR]),
-    hip:[0,0], hpL:map(s[L.HIPL]), hpR:map(s[L.HIPR]),
-    knL:map(s[L.KNL]), knR:map(s[L.KNR]),
-    anL:map(s[L.ANKL]), anR:map(s[L.ANKR])
+  const mir = Pose.mirror ? -1 : 1;
+  const shM = mid(s[L.SHL], s[L.SHR]), hpM = mid(s[L.HIPL], s[L.HIPR]);
+  const r = { hip:[0,0] };
+  /* walk the skeleton outward from the hips, taking each bone's direction
+     from the camera and its length from the character */
+  const place = (parent, child, a, b) => {
+    const dx = mir * (b.x - a.x), dy = b.y - a.y;
+    const m = Math.hypot(dx, dy) || 1;
+    const len = BL[parent + ">" + child];
+    r[child] = [ r[parent][0] + dx / m * len, r[parent][1] + dy / m * len ];
   };
+  place("hip","neck", hpM, shM);
+  place("neck","nose", shM, s[L.NOSE]);
+  place("neck","shL", shM, s[L.SHL]);   place("neck","shR", shM, s[L.SHR]);
+  place("shL","elL", s[L.SHL], s[L.ELL]); place("elL","wrL", s[L.ELL], s[L.WRL]);
+  place("shR","elR", s[L.SHR], s[L.ELR]); place("elR","wrR", s[L.ELR], s[L.WRR]);
+  place("hip","hpL", hpM, s[L.HIPL]);   place("hip","hpR", hpM, s[L.HIPR]);
+  place("hpL","knL", s[L.HIPL], s[L.KNL]); place("knL","anL", s[L.KNL], s[L.ANKL]);
+  place("hpR","knR", s[L.HIPR], s[L.KNR]); place("knR","anR", s[L.KNR], s[L.ANKR]);
+  /* plant the feet: crouching should drop the hips, not lift the shoes */
+  const dy = 1.42 - Math.max(r.anL[1], r.anR[1]);
+  for(const k in r) r[k][1] += dy;
+  return r;
 }
-/* ---- animation states: idle breath, walk cycle, punch, block,
-        hit recoil, knockout fall, victory ---- */
 function animRig(ft, t){
   const r = {}; for(const k in REST) r[k] = REST[k].slice();
   const k = ft.facing >= 0 ? 1 : -1;
@@ -1678,6 +1825,31 @@ function limb(c, A, B, w, fill, ol){
   c.beginPath(); c.moveTo(A[0], A[1]); c.lineTo(B[0], B[1]); c.stroke();
   c.strokeStyle = fill; c.lineWidth = w;
   c.beginPath(); c.moveTo(A[0], A[1]); c.lineTo(B[0], B[1]); c.stroke();
+}
+/* a hand: palm plus five fingers, curled or extended from live tracking */
+function drawHand(c, elbow, wrist, unit, hand, ol){
+  const ang = Math.atan2(wrist[1] - elbow[1], wrist[0] - elbow[0]);
+  const pr = unit * .135;
+  const up = hand ? hand.up : null;
+  const SPREAD = [-.78, -.32, -.06, .20, .46];   /* thumb first, then index..pinky */
+  const LEN    = [ .95,  1.35,  1.45, 1.32, 1.10];
+  for(let i = 0; i < 5; i++){
+    const extended = up ? up[i] : false;         /* no tracking reads as a fist */
+    const a = ang + SPREAD[i];
+    const len = pr * (extended ? LEN[i] : .48);
+    const bx = wrist[0] + Math.cos(a) * pr * .55;
+    const by = wrist[1] + Math.sin(a) * pr * .55;
+    const tx = wrist[0] + Math.cos(a) * (pr * .55 + len);
+    const ty = wrist[1] + Math.sin(a) * (pr * .55 + len);
+    c.lineCap = "round";
+    c.strokeStyle = "#000"; c.lineWidth = unit * .075 + ol * 2;
+    c.beginPath(); c.moveTo(bx, by); c.lineTo(tx, ty); c.stroke();
+    c.strokeStyle = "#FFC800"; c.lineWidth = unit * .075;
+    c.beginPath(); c.moveTo(bx, by); c.lineTo(tx, ty); c.stroke();
+  }
+  c.beginPath(); c.arc(wrist[0], wrist[1], pr, 0, 7);
+  c.fillStyle = "#FFC800"; c.fill();
+  c.lineWidth = ol * 2; c.strokeStyle = "#000"; c.stroke();
 }
 function blob(c, at, r, fill, ol){
   c.beginPath(); c.arc(at[0], at[1], r, 0, 7);
@@ -1762,7 +1934,7 @@ function drawCharacter(c, rig, cx, groundY, unit, facing, opts){
   /* back arm */
   limb(c, P2("shR"), P2("elR"), unit * .145, GY, ol);
   limb(c, P2("elR"), P2("wrR"), unit * .125, GY, ol);
-  blob(c, P2("wrR"), unit * .155, YL, ol);
+  drawHand(c, P2("elR"), P2("wrR"), unit * .92, opts.handR, ol);
 
   /* head */
   const hd = P2("nose"), hr = unit * .23;
@@ -1803,9 +1975,38 @@ function drawCharacter(c, rig, cx, groundY, unit, facing, opts){
   /* front arm on top */
   limb(c, P2("shL"), P2("elL"), unit * .155, WH, ol);
   limb(c, P2("elL"), P2("wrL"), unit * .135, WH, ol);
-  blob(c, P2("wrL"), unit * .17, YL, ol);
+  drawHand(c, P2("elL"), P2("wrL"), unit, opts.handL, ol);
 
   c.restore();
+}
+/* live preview of the chosen fighter, under the roster */
+const previewGhost = { f:null, facing:1, anim:"GUARD", animT:0, stun:0,
+                       vx:0, walk:0, ko:false, koT:0, win:false };
+function drawSelectPreview(t){
+  const g = ctxOf($("#selCanvas")); if(!g) return;
+  const { c, w, h } = g;
+  c.clearRect(0, 0, w, h);
+  c.fillStyle = "#F5F5F5"; c.fillRect(0, 0, w, h);
+  const groundY = h * .90, unit = h * .29;
+  c.strokeStyle = "#000"; c.lineWidth = 2;
+  c.beginPath(); c.moveTo(0, groundY); c.lineTo(w, groundY); c.stroke();
+  c.strokeStyle = "#D8D8D8"; c.lineWidth = 1;
+  for(let i = 1; i < 8; i++){
+    const x = w * i / 8;
+    c.beginPath(); c.moveTo(x, groundY); c.lineTo(x, groundY + h * .06); c.stroke();
+  }
+  const f = byId(P.fighter);
+  previewGhost.f = f;
+  previewGhost.walk = t * 2;
+  const tracked = Pose.running && Pose.cal;
+  const live = tracked ? liveRig() : null;
+  const hands = (Pose.running && Pose.handsOn) ? Pose.hands : { L:null, R:null };
+  drawCharacter(c, live || animRig(previewGhost, t), w / 2, groundY, unit, 1,
+    { id:f.id, handL:hands.L, handR:hands.R });
+  const tag = $("#selTag");
+  tag.textContent = tracked ? "LIVE — YOUR MOVEMENT" : (Pose.running ? "CALIBRATING" : "IDLE");
+  tag.classList.toggle("on", !!tracked);
+  $("#selHint").textContent = tracked ? f.id + " follows you" : "Turn the camera on to move them";
 }
 function drawArena(t){
   const g = ctxOf($("#arena")); if(!g) return;
@@ -1841,11 +2042,14 @@ function drawArena(t){
   c.strokeRect(px, groundY + 3, ox - px, 8);
 
   const live = (Pose.running && Pose.cal && !PL.ko && !PL.win) ? liveRig() : null;
+  const liveHands = (Pose.running && Pose.handsOn) ? Pose.hands : { L:null, R:null };
   drawCharacter(c, live || animRig(PL, t), px, groundY, unit, PL.facing,
-    { id:PL.f.id, glow: PL.animT > .1, koT: PL.koT });
+    { id:PL.f.id, glow: PL.animT > .1, koT: PL.koT,
+      handL: liveHands.L, handR: liveHands.R });
   const oRig = (Match.online && OP.netRig && !OP.ko) ? OP.netRig : animRig(OP, t);
   drawCharacter(c, oRig, ox, groundY, unit, OP.facing,
-    { id:OP.f.id, glow: OP.animT > .1, koT: OP.koT });
+    { id:OP.f.id, glow: OP.animT > .1, koT: OP.koT,
+      handL: OP.handL || null, handR: OP.handR || null });
 
   hitFx.forEach(f => {
     const r = unit * (f.big ? .95 : .6) * (1 - f.life / .22);
@@ -1994,8 +2198,15 @@ function applyMirror(){
   $("#cam").classList.toggle("mirror", Pose.mirror);
   $("#pipCam").classList.toggle("mirror", Pose.mirror);
 }
-$("#btnFight").addEventListener("click", startMatch);
-$("#btnRematch").addEventListener("click", startMatch);
+$("#btnFight").addEventListener("click", () => startMatch(false, false));
+const startTraining = () => {
+  startMatch(false, true);
+  toast(P.diff === 0 ? "Training — the dummy will not hit back. Nothing is scored."
+                     : "Training — nothing is scored. Pick Dummy for a still target.");
+};
+$("#btnTrain").addEventListener("click", startTraining);
+$("#btnTrain2").addEventListener("click", startTraining);
+$("#btnRematch").addEventListener("click", () => startMatch(false, false));
 $("#btnResume").addEventListener("click", togglePause);
 $("#btnHowto").addEventListener("click", () => {
   toast("Step in to reach. Punch fast for damage. Head hits hurt most. Esc pauses.");
@@ -2005,18 +2216,20 @@ $("#btnReset").addEventListener("click", () => {
   toast("Progress reset.");
 });
 
-/* every route into a fight is disabled until the camera is tracking */
+/* The camera is the point of the game, but it must never be the only way
+   in: a refused permission or a dead webcam still leaves a playable game. */
 function refreshGates(){
   const ok = canFight(), why = fightBlockReason();
   const bf = $("#btnFight");
   if(bf){
-    bf.disabled = !ok;
-    bf.textContent = ok ? "Fight" : "Camera required";
+    bf.disabled = false;
+    bf.textContent = "Fight";
     const n = $("#fightNote");
-    if(n) n.textContent = ok ? "Tracking live — step in and swing." : why;
+    if(n) n.textContent = ok ? "Tracking live — step in and swing."
+                             : why + " · or play now with A/D to punch, W to step in";
   }
   const nf = $("#btnNetFight");
-  if(nf) nf.disabled = !(ok && Net.on && Net.host);
+  if(nf) nf.disabled = !(Net.on && Net.host);
   const pill = $("#tCam");
   if(pill){
     pill.textContent = Pose.running ? (Pose.cal ? "CAMERA ON" : "CALIBRATE") : "CAMERA OFF";
@@ -2143,7 +2356,7 @@ const gestEls = $$("#gestList .gest"), qBits = $$("#qbar i");
 function paintSetup(){
   $("#rAct").textContent = Pose.running ? Pose.action : "—";
   $("#rSpeed").textContent = Pose.lastSpeed ? Pose.lastSpeed.toFixed(1) + " m/s" : "—";
-  $("#oFps").textContent = Pose.fps ? Pose.fps + " ms" : "—";
+  $("#oFps").textContent = Pose.realFps ? Pose.realFps + " FPS · " + Pose.fps + "ms" : "—";
   $("#oConf").textContent = Pose.quality ? Math.round(Pose.quality * 100) + "%" : "—";
   const lit = Math.round(Pose.quality * 10);
   qBits.forEach((b,i) => b.classList.toggle("on", i < lit));
@@ -2185,9 +2398,11 @@ function frame(now){
   let dt = (now - last) / 1000; last = now;
   if(dt > .1) dt = .1;
   poseTick(dt);
+  pollKeyboard();
   refreshGates();
   if(toastT > 0){ toastT -= dt; if(toastT <= 0) $("#toast").classList.remove("show"); }
   if(Screen.now === "setup"){ drawOverlay($("#overlay")); paintSetup(); }
+  if(Screen.now === "select") drawSelectPreview(now / 1000);
   if(Screen.now === "fight"){ matchTick(dt); netTick(now); drawArena(now / 1000); drawOverlay($("#pipC")); }
   requestAnimationFrame(frame);
 }
