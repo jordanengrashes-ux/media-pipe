@@ -771,7 +771,32 @@ const FIGHTERS = [
   { id:"FUSEBOX", glyph:"F", style:"RUSHDOWN", stats:[58,78,90,42,62,96,86],
     bio:"Reroutes power for the people the grid forgot. Fast hands, worse temper.",
     sp:"DEAD SHORT", spd:"Four strikes down a live cable; the last one stuns.",
-    unlock:{ type:"wins", cost:5 } }
+    unlock:{ type:"wins", cost:5 } },
+
+  { id:"MORTAR", glyph:"O", style:"BRICK AND MORTAR", stats:[94,74,38,98,84,54,30],
+    bio:"Lays two thousand bricks a week and has never once rushed a course. Wears you down by simply not moving.",
+    sp:"DEAD WEIGHT", spd:"Plants both feet and soaks the next three hits, then returns all of it at once.",
+    unlock:{ type:"coins", cost:3000 } },
+  { id:"JITNEY", glyph:"J", style:"HIT AND RUN", stats:[64,62,92,46,88,70,94],
+    bio:"Runs an unlicensed cab on the night shift. Knows every one-way street and treats a fight like one.",
+    sp:"CURBSIDE", spd:"Dashes past, strikes on the way through, and ends up behind you.",
+    unlock:{ type:"level", cost:8 } },
+  { id:"BRINE", glyph:"B", style:"SLIP AND HOOK", stats:[78,80,58,72,76,68,62],
+    bio:"Forty years on the fish counter. Hands like a vice, and nothing you throw quite gets a grip on her.",
+    sp:"COLD STORAGE", spd:"Clinches, then dumps you on the ice. Long stun, short reach.",
+    unlock:{ type:"coins", cost:2000 } },
+  { id:"TALLY", glyph:"T", style:"ODDS ON", stats:[70,68,76,64,70,94,78],
+    bio:"Takes bets on the same corner since he was fifteen. He has already seen the move you are about to repeat.",
+    sp:"LAST CALL", spd:"Damage scales with how often you have thrown that same attack.",
+    unlock:{ type:"wins", cost:8 } },
+  { id:"GRIDDLE", glyph:"G", style:"FLAT TOP", stats:[72,84,82,52,66,76,70],
+    bio:"Works a food cart outside the last bar to close. Fast hands, hot temper, no patience for a long fight.",
+    sp:"FULL SEAR", spd:"A burst of six short strikes that all land inside one second.",
+    unlock:{ type:"coins", cost:2800 } },
+  { id:"HALYARD", glyph:"H", style:"HIGH STEEL", stats:[82,88,54,70,74,72,88],
+    bio:"Walks beams forty storeys up without looking down. The longest reach on the circuit, and she knows it.",
+    sp:"SLACK LINE", spd:"Swings in on a rigging line for a strike that lands from well outside normal range.",
+    unlock:{ type:"level", cost:12 } }
 ];
 const byId = id => FIGHTERS.find(f => f.id === id) || FIGHTERS[0];
 const statOf = (f,k) => f.stats[STAT_KEYS.indexOf(k)];
@@ -1929,6 +1954,39 @@ function drawCharacter(c, rig, cx, groundY, unit, facing, opts){
   }else if(id === "PANEL"){
     c.strokeStyle = YL; c.lineWidth = ol * 2.2;
     c.strokeRect(mid2[0] - unit*.12, mid2[1] - unit*.10, unit*.24, unit*.20);
+  }else if(id === "MORTAR"){                      /* courses of brick */
+    c.strokeStyle = YL; c.lineWidth = ol * 2;
+    c.beginPath();
+    for(let i = -1; i <= 1; i++){
+      const y = mid2[1] + i * unit * .10;
+      c.moveTo(mid2[0] - unit*.14, y); c.lineTo(mid2[0] + unit*.14, y);
+    }
+    c.stroke();
+  }else if(id === "HALYARD"){                     /* rigging harness */
+    c.strokeStyle = YL; c.lineWidth = ol * 2.4;
+    c.beginPath();
+    c.moveTo(sL[0] + unit*.05, sL[1]); c.lineTo(hR[0] - unit*.03, hR[1] - unit*.06);
+    c.moveTo(sR[0] - unit*.05, sR[1]); c.lineTo(hL[0] + unit*.03, hL[1] - unit*.06);
+    c.stroke();
+  }else if(id === "BRINE"){                       /* apron bib */
+    c.fillStyle = GY;
+    c.fillRect(mid2[0] - unit*.13, mid2[1] - unit*.14, unit*.26, unit*.30);
+    c.lineWidth = ol*1.6; c.strokeStyle = "#000";
+    c.strokeRect(mid2[0] - unit*.13, mid2[1] - unit*.14, unit*.26, unit*.30);
+  }else if(id === "TALLY"){                       /* tally strokes */
+    c.strokeStyle = YL; c.lineWidth = ol * 2;
+    c.beginPath();
+    for(let i = 0; i < 4; i++){
+      const x = mid2[0] - unit*.11 + i * unit*.06;
+      c.moveTo(x, mid2[1] - unit*.10); c.lineTo(x, mid2[1] + unit*.10);
+    }
+    c.moveTo(mid2[0] - unit*.15, mid2[1] + unit*.09);
+    c.lineTo(mid2[0] + unit*.11, mid2[1] - unit*.09);
+    c.stroke();
+  }else if(id === "GRIDDLE"){                     /* hot plate */
+    c.fillStyle = YL;
+    c.beginPath(); c.arc(mid2[0], mid2[1], unit*.11, 0, 7); c.fill();
+    c.lineWidth = ol*1.8; c.strokeStyle = "#000"; c.stroke();
   }
 
   /* back arm */
@@ -1958,13 +2016,55 @@ function drawCharacter(c, rig, cx, groundY, unit, facing, opts){
     c.beginPath();
     c.moveTo(hd[0] - hr, hd[1] - hr*.30); c.lineTo(hd[0] + hr, hd[1] - hr*.30);
     c.strokeStyle = "#000"; c.lineWidth = hr*.52; c.stroke();
+  }else if(id === "MORTAR"){                      /* flat cap */
+    c.beginPath();
+    c.moveTo(hd[0] - hr*1.05, hd[1] - hr*.30);
+    c.quadraticCurveTo(hd[0], hd[1] - hr*1.30, hd[0] + hr*1.05, hd[1] - hr*.30);
+    c.closePath();
+    c.fillStyle = GY; c.fill(); c.lineWidth = ol*2; c.strokeStyle = "#000"; c.stroke();
+  }else if(id === "JITNEY"){                      /* driver's cap with a peak */
+    c.beginPath(); c.arc(hd[0], hd[1] - hr*.20, hr*.98, Math.PI, 0);
+    c.fillStyle = "#000"; c.fill();
+    c.beginPath();
+    c.ellipse(hd[0] + facing*hr*.62, hd[1] - hr*.16, hr*.72, hr*.20, 0, 0, 7);
+    c.fillStyle = YL; c.fill(); c.lineWidth = ol*1.8; c.strokeStyle = "#000"; c.stroke();
+  }else if(id === "BRINE"){                       /* bucket hat */
+    c.beginPath(); c.arc(hd[0], hd[1] - hr*.24, hr*.86, Math.PI, 0);
+    c.fillStyle = WH; c.fill(); c.lineWidth = ol*2; c.strokeStyle = "#000"; c.stroke();
+    c.beginPath();
+    c.ellipse(hd[0], hd[1] - hr*.22, hr*1.24, hr*.20, 0, 0, 7);
+    c.fillStyle = WH; c.fill(); c.stroke();
+  }else if(id === "TALLY"){                       /* dealer's eyeshade */
+    c.beginPath();
+    c.moveTo(hd[0] - hr*1.1, hd[1] - hr*.18);
+    c.lineTo(hd[0] + hr*1.1, hd[1] - hr*.18);
+    c.lineTo(hd[0] + hr*.7, hd[1] + hr*.22);
+    c.lineTo(hd[0] - hr*.7, hd[1] + hr*.22); c.closePath();
+    c.fillStyle = YL; c.fill(); c.lineWidth = ol*1.8; c.strokeStyle = "#000"; c.stroke();
+  }else if(id === "GRIDDLE"){                     /* knotted bandana */
+    c.beginPath();
+    c.moveTo(hd[0] - hr, hd[1] - hr*.36); c.lineTo(hd[0] + hr, hd[1] - hr*.36);
+    c.strokeStyle = "#000"; c.lineWidth = hr*.44; c.stroke();
+    c.beginPath();
+    c.moveTo(hd[0] - facing*hr*.95, hd[1] - hr*.36);
+    c.lineTo(hd[0] - facing*hr*1.55, hd[1] - hr*.70);
+    c.strokeStyle = "#000"; c.lineWidth = hr*.22; c.lineCap = "round"; c.stroke();
+  }else if(id === "HALYARD"){                     /* hard hat with a chin strap */
+    c.beginPath(); c.arc(hd[0], hd[1] - hr*.14, hr*1.0, Math.PI, 0);
+    c.fillStyle = WH; c.fill(); c.lineWidth = ol*2; c.strokeStyle = "#000"; c.stroke();
+    c.beginPath();
+    c.moveTo(hd[0] - hr*1.24, hd[1] - hr*.14); c.lineTo(hd[0] + hr*1.24, hd[1] - hr*.14);
+    c.lineWidth = ol*2.2; c.stroke();
+    c.beginPath();
+    c.moveTo(hd[0] - hr*.86, hd[1] - hr*.05); c.lineTo(hd[0] - hr*.30, hd[1] + hr*.80);
+    c.strokeStyle = YL; c.lineWidth = ol*1.8; c.stroke();
   }else{
     c.beginPath();
     c.moveTo(hd[0] - hr, hd[1] - hr*.38); c.lineTo(hd[0] + hr, hd[1] - hr*.38);
     c.strokeStyle = YL; c.lineWidth = hr*.30; c.stroke();
   }
   /* eyes look where the fighter faces */
-  if(id !== "RIVET" && !opts.koT){
+  if(id !== "RIVET" && id !== "TALLY" && !opts.koT){
     c.fillStyle = "#000";
     [.18,.52].forEach(o => {
       c.beginPath();
@@ -2282,7 +2382,11 @@ function paintFighterPanel(){
 }
 
 const SHOP = [
-  ["Fighters", [["MAYDAY","Counter specialist",2500],["SLAB","Tank · level 6",0],["FUSEBOX","Rushdown · 5 wins",0]]],
+  ["Fighters", FIGHTERS.filter(f => f.unlock).map(f => [
+     f.id,
+     f.style.toLowerCase().replace(/^./, c => c.toUpperCase()) +
+       (f.unlock.type === "coins" ? "" : " · " + unlockText(f).toLowerCase()),
+     f.unlock.type === "coins" ? f.unlock.cost : 0 ])],
   ["Effects", [["VOLT TRAIL","Motion trail",900],["EMBER STEP","Footfall particles",1400],["SPARK WAKE","Impact particles",1200],["ARC HALO","Ultimate aura",2000]]],
   ["Victory", [["LAST LIGHT","Victory animation",2000],["CURTAIN CALL","Victory animation",2400],["TAKE A BOW","Victory animation",1500]]],
   ["Emotes", [["CHALK LINE","Taunt",750],["SHOULDER ROLL","Taunt",600],["TAPE UP","Round start",650]]]
@@ -2309,7 +2413,9 @@ function paintShop(){
   $$("#shopGrid [data-buy]").forEach(b => b.addEventListener("click", () => {
     const price = +b.dataset.price, name = b.dataset.buy;
     if(P.coins < price){ toast("Not enough coins — you need " + (price - P.coins).toLocaleString() + " more."); return; }
-    P.coins -= price; P.owned.push(name); save(); paintShop();
+    P.coins -= price;
+    if(P.owned.indexOf(name) < 0) P.owned.push(name);
+    save(); paintShop(); paintRoster();
     toast(name + " purchased.");
   }));
   paintTopbar();
