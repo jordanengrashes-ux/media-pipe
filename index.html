@@ -1774,10 +1774,12 @@ function drawOverlay(cv){
    7. SCREENS
    ============================================================ */
 const Screen = { now:"title" };
+const SCREEN_IDS = ["title","setup","select","fight","result","online","shop","profile"];
 function go(id){
-  $$(".screen").forEach(s => s.classList.remove("on"));
   const el = $("#s-" + id);
-  if(el) el.classList.add("on");
+  if(!el) return;                      /* an unknown hash must not blank the app */
+  $$(".screen").forEach(s => s.classList.remove("on"));
+  el.classList.add("on");
   Screen.now = id;
   if(id === "select") paintRoster();
   if(id === "shop") paintShop();
@@ -1789,6 +1791,11 @@ function go(id){
 document.addEventListener("click", e => {
   const t = e.target.closest("[data-go]");
   if(t) go(t.dataset.go);
+});
+/* browser back/forward and shared links both work */
+addEventListener("hashchange", () => {
+  const id = location.hash.slice(1);
+  if(id && id !== Screen.now && SCREEN_IDS.indexOf(id) >= 0) go(id);
 });
 $("#goHome").addEventListener("click", () => go("title"));
 $("#btnPlay").addEventListener("click", () => go("select"));
@@ -1978,7 +1985,7 @@ if(P.cal) Pose.cal = P.cal;
 applyMirror(); paintCal();
 paintTopbar(); paintTitle();
 const initial = location.hash.slice(1);
-if(["title","setup","select","shop","profile","online"].indexOf(initial) >= 0) go(initial);
+if(initial && initial !== "fight" && SCREEN_IDS.indexOf(initial) >= 0) go(initial);
 
 /* ============================================================
    9. STARTUP CAMERA GATE
