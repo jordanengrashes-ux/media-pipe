@@ -1,0 +1,1246 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Flight Motion Sheet</title>
+<meta name="description" content="Eighteen looping flight motions for the Motion Brawler stick fighter, drawn on the game's own rig.">
+
+<style>
+/* ============================================================
+   FLIGHT MOTION SHEET — reference build
+   Same fixed palette as the game: white ground, black type,
+   grey for small type, yellow as the only accent.
+   Single theme on purpose — the character art is white-on-black
+   line work and only reads on paper.
+   ============================================================ */
+:root{
+  color-scheme: light;
+  --paper:#FFFFFF;
+  --ink:#000000;
+  --grey:#767676;
+  --grey-soft:#A0A0A0;
+  --rule:#D8D8D8;
+  --wash:#F5F5F5;
+  --yellow:#FFC800;
+  --yellow-pale:#FFF4CC;
+  --sans:"Helvetica Neue", Helvetica, Arial, system-ui, sans-serif;
+  --mono:Consolas, "SF Mono", Menlo, ui-monospace, monospace;
+}
+*{box-sizing:border-box}
+body{
+  margin:0; background:var(--paper); color:var(--ink);
+  font-family:var(--sans); font-size:15px; line-height:1.5;
+  -webkit-font-smoothing:antialiased;
+}
+button{font-family:inherit; color:inherit}
+:focus-visible{outline:3px solid var(--ink); outline-offset:2px}
+
+.wrap{max-width:1180px; margin:0 auto; padding:0 20px 90px}
+
+/* ---------- masthead ---------- */
+.head{
+  display:flex; align-items:flex-end; gap:20px; flex-wrap:wrap;
+  padding:26px 0 14px; border-bottom:2px solid var(--ink); margin-bottom:22px;
+}
+.head-t{flex:1; min-width:260px}
+.eyebrow{
+  font-family:var(--mono); font-size:10px; letter-spacing:.34em;
+  text-transform:uppercase; color:var(--grey); margin-bottom:8px;
+}
+h1{
+  margin:0; font-size:clamp(32px,5.4vw,62px); font-weight:800;
+  text-transform:uppercase; letter-spacing:-.02em; line-height:.9; text-wrap:balance;
+}
+h1 em{font-style:normal; background:var(--yellow); padding:0 .1em}
+.sub{margin:10px 0 0; max-width:56ch; color:var(--grey); font-size:14px}
+.count{
+  font-family:var(--mono); font-size:11px; letter-spacing:.08em; text-transform:uppercase;
+  color:var(--grey); text-align:right; line-height:1.9; white-space:nowrap;
+}
+.count b{display:block; font-size:34px; color:var(--ink); letter-spacing:-.02em; line-height:1}
+
+/* ---------- stage ---------- */
+.stage{
+  display:grid; grid-template-columns:1fr 268px; gap:0;
+  border:2px solid var(--ink); margin-bottom:34px;
+}
+@media (max-width:820px){ .stage{grid-template-columns:1fr} }
+.stage-c{position:relative; min-width:0}
+#stage{display:block; width:100%; height:clamp(340px,52vh,520px)}
+.stage-tag{
+  position:absolute; top:12px; left:12px; display:flex; gap:6px; align-items:center;
+}
+.tag{
+  font-family:var(--mono); font-size:10px; letter-spacing:.1em; text-transform:uppercase;
+  border:1px solid var(--ink); padding:3px 7px; background:var(--paper);
+}
+.tag.hot{background:var(--yellow)}
+
+/* ---------- side panel ---------- */
+.panel{border-left:2px solid var(--ink); display:flex; flex-direction:column}
+@media (max-width:820px){ .panel{border-left:0; border-top:2px solid var(--ink)} }
+.panel-h{padding:14px 16px 12px; border-bottom:1px solid var(--rule)}
+.panel-idx{font-family:var(--mono); font-size:11px; color:var(--grey); letter-spacing:.14em}
+.panel-n{font-size:21px; font-weight:800; text-transform:uppercase; letter-spacing:-.01em; line-height:1.1; margin-top:2px}
+.panel-u{font-size:13px; color:var(--grey); margin-top:8px}
+
+.readout{
+  display:grid; grid-template-columns:1fr 1fr; border-bottom:1px solid var(--rule);
+}
+.ro{padding:9px 16px; border-top:1px solid var(--rule)}
+.ro:nth-child(odd){border-right:1px solid var(--rule)}
+.ro-k{font-family:var(--mono); font-size:9px; letter-spacing:.14em; text-transform:uppercase; color:var(--grey)}
+.ro-v{font-family:var(--mono); font-size:16px; font-variant-numeric:tabular-nums; margin-top:1px}
+
+.scrub{padding:13px 16px 4px}
+.bar{height:8px; background:var(--wash); border:1px solid var(--ink); position:relative; cursor:pointer}
+.bar-f{position:absolute; inset:0 auto 0 0; background:var(--yellow); width:0%}
+.bar-m{position:absolute; top:-4px; bottom:-4px; width:2px; background:var(--ink); left:0}
+.ticks{display:flex; justify-content:space-between; font-family:var(--mono); font-size:9px; color:var(--grey-soft); margin-top:4px}
+
+.ctrls{padding:10px 16px 14px; display:flex; flex-wrap:wrap; gap:6px}
+.btn{
+  font-family:var(--mono); font-size:10px; letter-spacing:.09em; text-transform:uppercase;
+  border:1px solid var(--ink); background:var(--paper); padding:6px 9px; cursor:pointer;
+}
+.btn:hover{background:var(--wash)}
+.btn.on{background:var(--yellow)}
+.btn.wide{flex:1; text-align:center}
+.hint{
+  margin-top:auto; padding:10px 16px 14px; border-top:1px solid var(--rule);
+  font-family:var(--mono); font-size:9.5px; line-height:1.8; color:var(--grey-soft);
+  letter-spacing:.05em; text-transform:uppercase;
+}
+.hint kbd{border:1px solid var(--rule); padding:0 4px; color:var(--grey)}
+
+/* ---------- groups + contact sheet ---------- */
+.grp{margin-top:34px}
+.grp-h{display:flex; align-items:baseline; gap:12px; border-bottom:1px solid var(--ink); padding-bottom:7px}
+.grp-n{font-size:15px; font-weight:800; text-transform:uppercase; letter-spacing:.06em}
+.grp-d{font-size:12.5px; color:var(--grey); flex:1}
+.grp-c{font-family:var(--mono); font-size:10px; color:var(--grey-soft); letter-spacing:.1em}
+
+.sheet{display:grid; grid-template-columns:repeat(auto-fill,minmax(196px,1fr)); gap:-1px 0}
+.card{
+  border:1px solid var(--rule); border-top:0; margin:-1px 0 0 -1px;
+  background:none; padding:0; text-align:left; cursor:pointer; display:block; width:100%;
+}
+.card:hover{background:var(--wash)}
+.card.on{outline:2px solid var(--ink); outline-offset:-2px; position:relative; z-index:1}
+.card canvas{display:block; width:100%; height:150px; background:var(--paper)}
+.card.on canvas{background:var(--yellow-pale)}
+.card-t{padding:8px 10px 11px; border-top:1px solid var(--rule)}
+.card-i{font-family:var(--mono); font-size:9.5px; color:var(--grey-soft); letter-spacing:.14em}
+.card-n{font-size:13px; font-weight:800; text-transform:uppercase; letter-spacing:.01em; margin-top:1px}
+.card-u{font-size:11.5px; color:var(--grey); line-height:1.45; margin-top:4px}
+
+/* ---------- footer note ---------- */
+.note{
+  margin-top:44px; border-top:2px solid var(--ink); padding-top:16px;
+  display:grid; grid-template-columns:repeat(auto-fit,minmax(230px,1fr)); gap:22px;
+}
+.note h3{margin:0 0 6px; font-size:11px; font-weight:800; text-transform:uppercase; letter-spacing:.14em}
+.note p{margin:0; font-size:12.5px; color:var(--grey); line-height:1.6}
+.note code{font-family:var(--mono); font-size:11.5px; color:var(--ink); background:var(--wash); padding:1px 4px}
+
+@media (prefers-reduced-motion: reduce){ .card canvas{opacity:.999} }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="head">
+    <div class="head-t">
+      <div class="eyebrow">Motion Brawler — animation reference</div>
+      <h1>Flight <em>Motions</em></h1>
+      <p class="sub">Eighteen airborne moves drawn on the game's own rig — same joints, same bone lengths, same line weights as <code style="font-family:var(--mono);font-size:12px">drawCharacter</code>. Pick one to inspect it full size.</p>
+    </div>
+    <div class="count"><b>18</b>motions / 5 phases</div>
+  </header>
+
+  <section class="stage">
+    <div class="stage-c">
+      <canvas id="stage"></canvas>
+      <div class="stage-tag">
+        <span class="tag hot" id="tagPhase">TAKEOFF</span>
+        <span class="tag" id="tagState">PLAYING</span>
+      </div>
+    </div>
+    <aside class="panel">
+      <div class="panel-h">
+        <div class="panel-idx" id="pIdx">01</div>
+        <div class="panel-n" id="pName">Crouch Launch</div>
+        <div class="panel-u" id="pUse">—</div>
+      </div>
+      <div class="readout">
+        <div class="ro"><div class="ro-k">Phase</div><div class="ro-v" id="roP">0%</div></div>
+        <div class="ro"><div class="ro-k">Loop</div><div class="ro-v" id="roD">1.50s</div></div>
+        <div class="ro"><div class="ro-k">Body angle</div><div class="ro-v" id="roR">0°</div></div>
+        <div class="ro"><div class="ro-k">Altitude</div><div class="ro-v" id="roY">0.0u</div></div>
+      </div>
+      <div class="scrub">
+        <div class="bar" id="bar"><div class="bar-f" id="barF"></div><div class="bar-m" id="barM"></div></div>
+        <div class="ticks"><span>0</span><span>¼</span><span>½</span><span>¾</span><span>1</span></div>
+      </div>
+      <div class="ctrls">
+        <button class="btn wide" id="bPlay">Pause</button>
+        <button class="btn" id="bPrev">‹ Prev</button>
+        <button class="btn" id="bNext">Next ›</button>
+        <button class="btn" id="bSpeed">Speed 1.0×</button>
+        <button class="btn" id="bTrail">Trail</button>
+        <button class="btn" id="bFx">FX</button>
+        <button class="btn" id="bRig">Bones</button>
+      </div>
+      <div class="hint">
+        <kbd>Space</kbd> play · <kbd>←</kbd><kbd>→</kbd> step frame · <kbd>↑</kbd><kbd>↓</kbd> motion
+      </div>
+    </aside>
+  </section>
+
+  <div id="sheet"></div>
+
+  <section class="note">
+    <div>
+      <h3>How to read it</h3>
+      <p>The grey limbs are the far side of the body, white the near side — same depth rule the arena uses. The left ruler is altitude in rig units, where one unit is a hip-to-knee bone and a standing fighter is 1.42 tall.</p>
+    </div>
+    <div>
+      <h3>Wiring one up</h3>
+      <p>Every motion is a pure <code>f(p)</code> over a 0–1 loop returning <code>{rig, rot, x, y}</code>. Drop the body into a new <code>ft.anim</code> case in <code>animRig</code> and feed it <code>1 - ft.animT/dur</code>.</p>
+    </div>
+    <div>
+      <h3>What's still missing</h3>
+      <p>Rotation is new — <code>drawCharacter</code> plants the rig at ground level with no body angle, so it needs an <code>opts.rot</code> that spins joints about the hip before projecting.</p>
+    </div>
+  </section>
+
+</div>
+
+<script>
+"use strict";
+/* ============================================================
+   1. RIG — copied verbatim from the game so poses transfer
+   ============================================================ */
+const REST = {
+  nose:[0,-1.28], neck:[0,-1.0], shL:[-.40,-1.0], shR:[.40,-1.0],
+  elL:[-.74,-.48], elR:[.74,-.48], wrL:[-.34,-1.02], wrR:[.34,-1.02],
+  hip:[0,0], hpL:[-.28,0], hpR:[.28,0],
+  knL:[-.26,.72], knR:[.26,.72], anL:[-.24,1.42], anR:[.24,1.42]
+};
+const RIG_BONES = [["nose","neck"],["neck","shL"],["neck","shR"],["shL","elL"],["elL","wrL"],
+  ["shR","elR"],["elR","wrR"],["neck","hip"],["hip","hpL"],["hip","hpR"],
+  ["hpL","knL"],["knL","anL"],["hpR","knR"],["knR","anR"],["shL","hpL"],["shR","hpR"]];
+const BL = {};
+[["hip","neck"],["neck","nose"],["neck","shL"],["neck","shR"],
+ ["shL","elL"],["elL","wrL"],["shR","elR"],["elR","wrR"],
+ ["hip","hpL"],["hip","hpR"],["hpL","knL"],["knL","anL"],
+ ["hpR","knR"],["knR","anR"]].forEach(([a,b]) => {
+  BL[a + ">" + b] = Math.hypot(REST[a][0] - REST[b][0], REST[a][1] - REST[b][1]);
+});
+
+const clamp = (v,a,b) => v < a ? a : v > b ? b : v;
+const lerp  = (a,b,t) => a + (b-a)*t;
+/* local phase inside a window of the loop, clamped at both ends */
+const seg   = (p,a,b) => clamp((p-a)/(b-a), 0, 1);
+const eOut  = t => 1 - Math.pow(1-t, 3);
+const eIn   = t => t*t*t;
+const eIO   = t => t < .5 ? 4*t*t*t : 1 - Math.pow(-2*t+2, 3)/2;
+const TAU = Math.PI * 2;
+const R = () => { const r = {}; for(const k in REST) r[k] = REST[k].slice(); return r; };
+
+/* Two-bone IK. bend = -1 puts the joint forward for a right-facing
+   fighter (knee toward +x), +1 puts it behind. Over-reach is clamped
+   to just under full extension so the limb never inverts. */
+function ik(r, root, mid, end, tx, ty, bend){
+  const L1 = BL[root+">"+mid], L2 = BL[mid+">"+end];
+  const rx = r[root][0], ry = r[root][1];
+  const dx = tx - rx, dy = ty - ry;
+  const raw = Math.hypot(dx, dy) || 1e-6;
+  const ux = dx/raw, uy = dy/raw;
+  const d = clamp(raw, Math.abs(L1-L2) + 1e-3, (L1+L2) * .999);
+  const a = (L1*L1 - L2*L2 + d*d) / (2*d);
+  const h = Math.sqrt(Math.max(0, L1*L1 - a*a));
+  r[mid] = [rx + ux*a - uy*h*bend, ry + uy*a + ux*h*bend];
+  r[end] = [rx + ux*d, ry + uy*d];
+}
+const arm = (r,s,tx,ty,bend) => ik(r, "sh"+s, "el"+s, "wr"+s, tx, ty, bend == null ? 1 : bend);
+const leg = (r,s,tx,ty,bend) => ik(r, "hp"+s, "kn"+s, "an"+s, tx, ty, bend == null ? -1 : bend);
+/* Walk the skeleton outward and force every bone back to its rest length,
+   keeping the direction it was posed in. Poses can then be written as
+   "point the shin here" without arithmetic to keep the limb from stretching. */
+const CHAIN = [["hip","neck"],["neck","nose"],["neck","shL"],["neck","shR"],
+  ["shL","elL"],["elL","wrL"],["shR","elR"],["elR","wrR"],
+  ["hip","hpL"],["hip","hpR"],["hpL","knL"],["knL","anL"],
+  ["hpR","knR"],["knR","anR"]];
+function fixBones(r){
+  CHAIN.forEach(([a,b]) => {
+    const len = BL[a+">"+b];
+    let dx = r[b][0] - r[a][0], dy = r[b][1] - r[a][1];
+    let m = Math.hypot(dx, dy);
+    if(m < 1e-5){ dx = REST[b][0]-REST[a][0]; dy = REST[b][1]-REST[a][1]; m = len; }
+    r[b] = [ r[a][0] + dx/m*len, r[a][1] + dy/m*len ];
+  });
+  return r;
+}
+/* swap near/far limbs so a rolling body keeps its shading honest */
+function swapLR(r){
+  [["shL","shR"],["elL","elR"],["wrL","wrR"],["hpL","hpR"],["knL","knR"],["anL","anR"]]
+    .forEach(([a,b]) => { const t = r[a]; r[a] = r[b]; r[b] = t; });
+  return r;
+}
+
+/* ============================================================
+   2. CHARACTER — the arena's drawCharacter, plus body rotation
+      about the hip and an axial squash for rolls
+   ============================================================ */
+const WH = "#FFF", GY = "#D8D8D8", YL = "#FFC800", IK = "#000";
+
+function limb(c, A, B, w, fill, ol){
+  c.lineCap = "round";
+  c.strokeStyle = IK; c.lineWidth = w + ol*2;
+  c.beginPath(); c.moveTo(A[0],A[1]); c.lineTo(B[0],B[1]); c.stroke();
+  c.strokeStyle = fill; c.lineWidth = w;
+  c.beginPath(); c.moveTo(A[0],A[1]); c.lineTo(B[0],B[1]); c.stroke();
+}
+function blob(c, at, r, fill, ol){
+  c.beginPath(); c.arc(at[0], at[1], r, 0, 7);
+  c.fillStyle = fill; c.fill();
+  c.lineWidth = ol*2; c.strokeStyle = IK; c.stroke();
+}
+function glove(c, at, unit, ol){
+  c.beginPath(); c.arc(at[0], at[1], unit*.17, 0, 7);
+  c.fillStyle = YL; c.fill();
+  c.lineWidth = ol*2; c.strokeStyle = IK; c.stroke();
+}
+
+/* cx,cy is the HIP in screen space — flight has no ground to plant on */
+function project(rig, cx, cy, unit, facing, rot, sq){
+  const cs = Math.cos(rot), sn = Math.sin(rot);
+  return j => {
+    const p = rig[j], x = p[0]*sq, y = p[1];
+    return [ cx + (x*cs - y*sn) * unit * facing, cy + (x*sn + y*cs) * unit ];
+  };
+}
+function drawFighter(c, rig, cx, cy, unit, facing, o){
+  o = o || {};
+  let sq = o.squash == null ? 1 : o.squash;
+  if(sq < 0){ rig = swapLR(Object.assign({}, rig)); sq = -sq; }
+  const P = project(rig, cx, cy, unit, facing, o.rot || 0, sq);
+  const ol = unit*.035;
+
+  c.save();
+  if(o.alpha != null) c.globalAlpha = o.alpha;
+
+  if(o.glow){                                    /* attack flash behind the body */
+    const g = new Path2D();
+    RIG_BONES.forEach(b => { const A = P(b[0]), B = P(b[1]); g.moveTo(A[0],A[1]); g.lineTo(B[0],B[1]); });
+    c.strokeStyle = YL; c.lineWidth = unit*.46; c.lineCap = "round"; c.lineJoin = "round";
+    c.stroke(g);
+  }
+
+  /* far leg, then near leg */
+  limb(c, P("hpR"), P("knR"), unit*.19,  GY, ol);
+  limb(c, P("knR"), P("anR"), unit*.155, GY, ol);
+  limb(c, P("hpL"), P("knL"), unit*.20,  WH, ol);
+  limb(c, P("knL"), P("anL"), unit*.165, WH, ol);
+  [["anR","knR"],["anL","knL"]].forEach(([j,k]) => {   /* boots point away from the shin */
+    const a = P(j), b = P(k);
+    let dx = a[0]-b[0], dy = a[1]-b[1];
+    const m = Math.hypot(dx,dy) || 1; dx /= m; dy /= m;
+    c.save(); c.translate(a[0] + dx*unit*.02, a[1] + dy*unit*.02);
+    c.rotate(Math.atan2(dy,dx) - Math.PI/2);
+    c.beginPath(); c.ellipse(facing*unit*.06, unit*.01, unit*.17, unit*.10, 0, 0, 7);
+    c.fillStyle = IK; c.fill(); c.restore();
+  });
+
+  /* torso */
+  const sL = P("shL"), sR = P("shR"), hL = P("hpL"), hR = P("hpR");
+  c.beginPath();
+  c.moveTo(sL[0],sL[1]); c.lineTo(sR[0],sR[1]); c.lineTo(hR[0],hR[1]); c.lineTo(hL[0],hL[1]);
+  c.closePath();
+  c.fillStyle = WH; c.fill();
+  c.lineWidth = ol*2; c.strokeStyle = IK; c.lineJoin = "round"; c.stroke();
+  /* belt, pulled toward the hips so it survives rotation */
+  c.beginPath();
+  c.moveTo(lerp(hL[0],sL[0],.10), lerp(hL[1],sL[1],.10));
+  c.lineTo(lerp(hR[0],sR[0],.10), lerp(hR[1],sR[1],.10));
+  c.lineTo(lerp(hR[0],sR[0],-.05), lerp(hR[1],sR[1],-.05));
+  c.lineTo(lerp(hL[0],sL[0],-.05), lerp(hL[1],sL[1],-.05));
+  c.closePath();
+  c.fillStyle = YL; c.fill(); c.lineWidth = ol*1.6; c.stroke();
+
+  /* far arm */
+  limb(c, P("shR"), P("elR"), unit*.145, GY, ol);
+  limb(c, P("elR"), P("wrR"), unit*.125, GY, ol);
+  glove(c, P("wrR"), unit*.92, ol);
+
+  /* head: band and eyes ride the body angle */
+  const hd = P("nose"), nk = P("neck"), hr = unit*.23;
+  blob(c, hd, hr, WH, ol);
+  const ang = Math.atan2(hd[1]-nk[1], hd[0]-nk[0]) + Math.PI/2;
+  c.save(); c.translate(hd[0], hd[1]); c.rotate(ang);
+  c.beginPath(); c.moveTo(-hr, -hr*.38); c.lineTo(hr, -hr*.38);
+  c.strokeStyle = YL; c.lineWidth = hr*.30; c.lineCap = "butt"; c.stroke();
+  c.fillStyle = IK;
+  [.18,.52].forEach(d => { c.beginPath(); c.arc(facing*hr*d, hr*.16, hr*.11, 0, 7); c.fill(); });
+  c.restore();
+
+  /* near arm on top */
+  limb(c, P("shL"), P("elL"), unit*.155, WH, ol);
+  limb(c, P("elL"), P("wrL"), unit*.135, WH, ol);
+  glove(c, P("wrL"), unit, ol);
+
+  if(o.bones){                                   /* tuning overlay */
+    c.strokeStyle = "#FF0000"; c.lineWidth = 1; c.globalAlpha = .85;
+    RIG_BONES.forEach(b => {
+      const A = P(b[0]), B = P(b[1]);
+      c.beginPath(); c.moveTo(A[0],A[1]); c.lineTo(B[0],B[1]); c.stroke();
+    });
+    c.fillStyle = "#FF0000";
+    for(const k in rig){ const a = P(k); c.beginPath(); c.arc(a[0],a[1],1.9,0,7); c.fill(); }
+  }
+  c.restore();
+}
+
+/* ============================================================
+   3. EFFECTS — everything is drawn in screen space from E
+   ============================================================ */
+const rnd = i => { const x = Math.sin(i*127.1 + 311.7) * 43758.5453; return x - Math.floor(x); };
+
+/* streaks flowing along `ang`, scrolling with the loop */
+function speed(c, E, ang, n, o){
+  o = o || {};
+  const u = E.unit, len = (o.len || 1.9)*u, spread = (o.spread || 2.2)*u;
+  const cs = Math.cos(ang), sn = Math.sin(ang);
+  c.save();
+  c.strokeStyle = o.color || IK; c.lineCap = "round";
+  for(let i = 0; i < n; i++){
+    const off = (rnd(i) + E.p * (o.rate || 3)) % 1;
+    const across = (rnd(i+90) - .5) * spread * 2;
+    const l = len * (.35 + rnd(i+40)*.9);
+    const back = (o.reach || 5.2)*u;
+    const d = -off*back + (o.ahead || 1.1)*u;
+    const x = E.cx + cs*d - sn*across, y = E.cy + sn*d + cs*across;
+    c.globalAlpha = (o.alpha || .5) * Math.sin(off*Math.PI) * (.4 + rnd(i+7)*.6);
+    c.lineWidth = u*(.02 + rnd(i+15)*.035);
+    c.beginPath(); c.moveTo(x, y); c.lineTo(x - cs*l, y - sn*l); c.stroke();
+  }
+  c.restore();
+}
+/* a tapered thrust plume from `at`, blown along `ang` */
+function plume(c, E, at, ang, power){
+  const u = E.unit, cs = Math.cos(ang), sn = Math.sin(ang);
+  const flick = .82 + Math.sin(E.t*38)*.18;
+  const L = u*power*flick, W = u*.30;
+  c.save();
+  c.translate(at[0], at[1]); c.rotate(ang);
+  c.beginPath();
+  c.moveTo(0, -W); c.quadraticCurveTo(L*.55, -W*.42, L, 0);
+  c.quadraticCurveTo(L*.55, W*.42, 0, W);
+  c.closePath();
+  c.fillStyle = YL; c.globalAlpha = .9; c.fill();
+  c.lineWidth = u*.03; c.strokeStyle = IK; c.globalAlpha = 1; c.stroke();
+  c.globalAlpha = .55; c.strokeStyle = IK; c.lineWidth = u*.025;
+  for(let i = -1; i <= 1; i += 2){
+    c.beginPath(); c.moveTo(L*.5, i*W*.3); c.lineTo(L*1.5*flick, i*W*.1); c.stroke();
+  }
+  c.restore();
+}
+function ring(c, E, at, r, o){
+  o = o || {};
+  c.save();
+  c.globalAlpha = o.alpha == null ? .8 : o.alpha;
+  c.strokeStyle = o.color || IK; c.lineWidth = E.unit*(o.w || .05);
+  c.beginPath();
+  c.ellipse(at[0], at[1], r, r*(o.flat || 1), 0, 0, 7);
+  c.stroke(); c.restore();
+}
+function burst(c, E, at, r, n){
+  const u = E.unit;
+  c.save(); c.lineCap = "round";
+  for(let i = 0; i < n; i++){
+    const a = i/n*TAU + .3, l = r*(.55 + rnd(i)*.75);
+    c.strokeStyle = i % 2 ? YL : IK; c.lineWidth = u*(i % 2 ? .07 : .045);
+    c.beginPath();
+    c.moveTo(at[0] + Math.cos(a)*r*.28, at[1] + Math.sin(a)*r*.28);
+    c.lineTo(at[0] + Math.cos(a)*l, at[1] + Math.sin(a)*l);
+    c.stroke();
+  }
+  c.restore();
+}
+/* dust rolling out along the floor */
+function dust(c, E, x, r, alpha){
+  const u = E.unit;
+  c.save(); c.globalAlpha = alpha; c.strokeStyle = IK; c.lineWidth = u*.035;
+  for(let s = -1; s <= 1; s += 2){
+    for(let i = 0; i < 3; i++){
+      const rr = r*(.45 + i*.30);
+      c.beginPath();
+      c.arc(x + s*rr, E.ground - u*.10 - i*u*.07, u*(.16 + i*.05), Math.PI*1.05, Math.PI*1.95);
+      c.stroke();
+    }
+  }
+  c.globalAlpha = alpha*.75;
+  c.beginPath();
+  c.ellipse(x, E.ground, r*1.15, u*.10, 0, Math.PI, 0);
+  c.stroke(); c.restore();
+}
+function cracks(c, E, x, r, alpha){
+  const u = E.unit;
+  c.save(); c.globalAlpha = alpha; c.strokeStyle = IK; c.lineWidth = u*.045; c.lineCap = "round";
+  for(let i = 0; i < 7; i++){
+    const s = i % 2 ? 1 : -1, l = r*(.35 + rnd(i+3)*.9);
+    c.beginPath(); c.moveTo(x, E.ground);
+    c.lineTo(x + s*l*.7, E.ground + u*.10*rnd(i));
+    c.lineTo(x + s*l, E.ground - u*.05);
+    c.stroke();
+  }
+  c.restore();
+}
+/* an arc swept by a limb, for kicks and rising punches */
+function sweep(c, E, at, r, a0, a1, w){
+  c.save();
+  c.strokeStyle = YL; c.lineWidth = E.unit*(w || .30); c.lineCap = "round";
+  c.globalAlpha = .85;
+  c.beginPath(); c.arc(at[0], at[1], r, a0, a1); c.stroke();
+  c.strokeStyle = IK; c.lineWidth = E.unit*.02; c.globalAlpha = .6;
+  c.beginPath(); c.arc(at[0], at[1], r, a0, a1); c.stroke();
+  c.restore();
+}
+
+/* ============================================================
+   4. THE MOTIONS
+      f(p) -> { rig, rot, x, y, squash, facing, glow }
+        p    0..1 loop phase
+        x,y  offset in rig units; y is height above a standing hip,
+             so y = 0 puts the feet on the floor
+        rot  body angle, +PI/2 is horizontal facing the travel
+   ============================================================ */
+const GROUPS = [
+  { n:"Takeoff & hover", d:"Leaving the floor and holding station. Everything else has to start here." },
+  { n:"Cruise",          d:"Sustained travel. Read at a glance from silhouette alone, since these run the longest." },
+  { n:"Air combat",      d:"Flight used as a weapon — the moves that carry a hitbox." },
+  { n:"Control & evasion", d:"Cancelling momentum. What makes flight feel driven rather than fired." },
+  { n:"Landing",         d:"Paying the altitude back." }
+];
+
+/* ground contact: a joint touches the floor when its rig y equals 1.42 + Y */
+const FLOOR = Y => 1.42 + Y;
+
+const MOTIONS = [
+/* ---------------- 0 · TAKEOFF & HOVER ---------------- */
+{ id:"LAUNCH", name:"Crouch Launch", grp:0, dur:1.5,
+  use:"Loads on the floor, then leaves it. The only way into flight from a standing guard.",
+  f(p){
+    const r = R();
+    const load = seg(p,0,.30), fire = seg(p,.30,.42), air = seg(p,.42,1);
+    let Y;
+    if(p < .30)      Y = -.46*eOut(load);
+    else if(p < .42) Y = lerp(-.46, .38, eOut(fire));
+    else             Y = .38 + 3.30*eOut(air);
+    const g = FLOOR(Y);
+
+    if(p < .46){                                   /* feet still own the floor */
+      leg(r,"L", -.22, g, -1);
+      leg(r,"R",  .26, g, -1);
+    }else{                                         /* trail them straight behind */
+      const t = seg(p,.46,.62);
+      leg(r,"L", lerp(-.22,-.16,t), lerp(g,1.52,t), -1);
+      leg(r,"R", lerp( .26, .12,t), lerp(g,1.50,t), -1);
+    }
+    if(p < .30){                                   /* wind the arms back */
+      const t = eOut(load);
+      arm(r,"L", lerp(-.34,-.66,t), lerp(-1.02,.26,t), 1);
+      arm(r,"R", lerp( .34,-.80,t), lerp(-1.02,.10,t), 1);
+    }else{
+      const t = eOut(seg(p,.30,.60));
+      arm(r,"L", lerp(-.66,-.26,t), lerp( .26,-2.28,t), 1);
+      arm(r,"R", lerp(-.80, .26,t), lerp( .10,-2.24,t), -1);
+    }
+    r.nose[0] += .17*eOut(load); r.nose[1] += .09*eOut(load) - .04;
+    return { rig:r, rot:(p < .42 ? .10*eOut(load) : -.10*eOut(air)), x:0, y:Y,
+      fx(c,E){
+        if(p > .30 && p < .70) dust(c, E, E.cx, E.unit*(.5 + 2.4*seg(p,.30,.70)), 1 - seg(p,.30,.70));
+        if(p > .40){
+          const a = seg(p,.40,.60);
+          plume(c, E, [E.cx - E.unit*.22, E.cy + E.unit*1.5], Math.PI/2, 1.1*a);
+          plume(c, E, [E.cx + E.unit*.22, E.cy + E.unit*1.4], Math.PI/2, .9*a);
+          speed(c, E, -Math.PI/2, 12, { rate:5, reach:4, alpha:.35*a });
+        }
+      } };
+  } },
+
+{ id:"CLIMB", name:"Rocket Climb", grp:0, dur:1.0,
+  use:"Straight-up ascent with one fist leading. Holds while the button is down.",
+  f(p){
+    const r = R();
+    const w = Math.sin(p*TAU);
+    arm(r,"L", .22 + w*.05, -2.32, 1);
+    arm(r,"R", .30, .34 + w*.04, -1);
+    leg(r,"L", -.12 + w*.06, 1.50, -1);
+    leg(r,"R",  .14 - w*.06, 1.48, -1);
+    r.nose[0] += .06; r.nose[1] -= .02;
+    return { rig:r, rot:-.14 + w*.045, x:w*.06, y:2.35 + w*.06,
+      fx(c,E){
+        plume(c, E, [E.cx - E.unit*.16, E.cy + E.unit*1.55], Math.PI/2, 1.5);
+        plume(c, E, [E.cx + E.unit*.18, E.cy + E.unit*1.52], Math.PI/2, 1.25);
+        speed(c, E, -Math.PI/2, 20, { rate:6, reach:7, spread:2.6, alpha:.45, len:2.4 });
+      } };
+  } },
+
+{ id:"HOVER", name:"Hover Idle", grp:0, dur:2.4,
+  use:"Neutral in the air. Blocking, aiming and every air cancel return to this pose.",
+  f(p){
+    const r = R();
+    const b = Math.sin(p*TAU), b2 = Math.sin(p*TAU + 1.1);
+    leg(r,"L", -.34, 1.24 + b*.05, -1);
+    leg(r,"R",  .30, 1.16 - b*.05, -1);
+    arm(r,"L", -.72 + b2*.05, -.34 + b2*.06, 1);
+    arm(r,"R",  .70 - b2*.05, -.30 - b2*.06, -1);
+    r.nose[1] += b*.02;
+    return { rig:r, rot:.05*b2, x:.10*b2, y:2.05 + .16*b,
+      fx(c,E){
+        const u = E.unit;
+        c.save(); c.strokeStyle = IK; c.lineWidth = u*.03;
+        for(let i = 0; i < 3; i++){
+          const t = (p*1.2 + i/3) % 1;
+          c.globalAlpha = .40 * (1-t);
+          c.beginPath();
+          c.ellipse(E.cx, E.cy + u*(1.85 + t*1.5), u*(.42 + t*.7), u*(.10 + t*.14), 0, .12, Math.PI-.12);
+          c.stroke();
+        }
+        c.restore();
+      } };
+  } },
+
+/* ---------------- 1 · CRUISE ---------------- */
+{ id:"DASH", name:"Superman Dash", grp:1, dur:1.0,
+  use:"The default travel pose. One fist forward, trailing arm tucked, body near flat.",
+  f(p){
+    const r = R();
+    const w = Math.sin(p*TAU);
+    arm(r,"L", .06, -2.30, 1);
+    arm(r,"R", .30, .58 + w*.04, -1);
+    leg(r,"L", -.14 + w*.10, 1.52, -1);
+    leg(r,"R",  .16 - w*.10, 1.48, -1);
+    r.nose[0] += .10; r.nose[1] += .04;
+    return { rig:r, rot:1.40 + w*.04, x:0, y:2.25 + w*.07,
+      fx(c,E){
+        speed(c, E, 1.40, 18, { rate:4.5, reach:6.5, spread:1.9, alpha:.5, len:2.6 });
+      } };
+  } },
+
+{ id:"CRUISE", name:"Twin-Fist Cruise", grp:1, dur:1.0,
+  use:"Tightest silhouette in the set, so it reads as the fast one. Both fists lead.",
+  f(p){
+    const r = R();
+    const w = Math.sin(p*TAU);
+    arm(r,"L",  .12, -2.30, 1);
+    arm(r,"R", -.12, -2.28, -1);
+    leg(r,"L", -.09 + w*.04, 1.53, -1);
+    leg(r,"R",  .09 - w*.04, 1.51, -1);
+    r.nose[0] += .04;
+    return { rig:r, rot:1.53 + w*.02, x:0, y:2.3 + w*.05,
+      fx(c,E){
+        const u = E.unit;
+        speed(c, E, 1.53, 24, { rate:6, reach:8, spread:1.5, alpha:.55, len:3.2 });
+        const tip = [E.cx + u*3.4, E.cy];                /* pressure cone at the fists */
+        c.save(); c.strokeStyle = IK; c.lineWidth = u*.05; c.globalAlpha = .7;
+        for(let i = 1; i <= 2; i++){
+          c.beginPath();
+          c.moveTo(tip[0] - u*.5*i, tip[1] - u*.62*i);
+          c.lineTo(tip[0] + u*.30*i, tip[1]);
+          c.lineTo(tip[0] - u*.5*i, tip[1] + u*.62*i);
+          c.stroke();
+        }
+        c.restore();
+      } };
+  } },
+
+{ id:"GLIDE", name:"Glide Spread", grp:1, dur:2.6,
+  use:"Arms out wide, no thrust. The slow read that says altitude is being spent, not made.",
+  f(p){
+    const r = R();
+    const w = Math.sin(p*TAU);
+    arm(r,"L", -1.48, -1.02 - w*.10, 1);
+    arm(r,"R",  1.48, -1.02 + w*.10, -1);
+    leg(r,"L", -.34, 1.46, -1);
+    leg(r,"R",  .34, 1.42, -1);
+    return { rig:r, rot:1.14 + w*.20, x:.35*w, y:2.25 + .22*Math.sin(p*TAU + 1.2),
+      fx(c,E){
+        speed(c, E, 1.14, 9, { rate:1.6, reach:7, spread:3.2, alpha:.3, len:3.4 });
+      } };
+  } },
+
+{ id:"BANK", name:"Bank Turn", grp:1, dur:2.4,
+  use:"Carves an arc instead of turning on the spot. Facing flips at the top of the curve.",
+  f(p){
+    const th = p*TAU;
+    const X = 2.1*Math.sin(th), Y = 2.3 + .85*Math.cos(th);
+    const dx = Math.cos(th), dyScreen = .85*Math.sin(th);   /* screen y grows downward */
+    const facing = dx >= 0 ? 1 : -1;
+    const a = Math.atan2(dx, -dyScreen);
+    const r = R();
+    arm(r,"L", -1.10, -1.62, 1);                            /* outer arm reaches up-out */
+    arm(r,"R",  1.00, -.30, -1);                            /* inner arm tucked low */
+    leg(r,"L", -.26, 1.48, -1);
+    leg(r,"R",  .22, 1.44, -1);
+    r.nose[0] += .12;
+    return { rig:r, rot:a*facing, x:X, y:Y, facing,
+      fx(c,E){
+        const u = E.unit;
+        c.save(); c.strokeStyle = IK; c.lineWidth = u*.03; c.globalAlpha = .28;
+        c.setLineDash([u*.22, u*.20]);
+        c.beginPath();
+        for(let i = 0; i <= 60; i++){
+          const t = i/60*TAU;
+          const px = E.cx0 + 2.1*Math.sin(t)*u, py = E.ground - (1.42 + 2.3 + .85*Math.cos(t))*u;
+          i ? c.lineTo(px,py) : c.moveTo(px,py);
+        }
+        c.stroke(); c.restore();
+        speed(c, E, E.rot*E.facing, 10, { rate:3, reach:4.5, spread:1.8, alpha:.35 });
+      } };
+  } },
+
+{ id:"DRIFT", name:"Back Drift", grp:1, dur:2.8,
+  use:"Retreating without turning around, so the fighter keeps facing the threat.",
+  f(p){
+    const r = R();
+    const w = Math.sin(p*TAU);
+    r.nose = [-.14,-1.26];
+    r.elL = [-1.00,-1.14]; r.wrL = [-.28,-1.42];            /* hands laced behind the head */
+    r.elR = [ .92,-1.10];  r.wrR = [ .22,-1.40];
+    leg(r,"L",  .16, 1.40 + w*.03, -1);                     /* ankles crossed, lazy */
+    leg(r,"R", -.14, 1.34 - w*.03,  1);
+    return { rig:r, rot:-.52 + .06*w, x:.9*Math.sin(p*TAU), y:2.15 + .14*Math.cos(p*TAU),
+      fx(c,E){
+        speed(c, E, -.52 + Math.PI, 8, { rate:1.4, reach:4, spread:2.4, alpha:.26, len:1.6 });
+      } };
+  } },
+
+/* ---------------- 2 · AIR COMBAT ---------------- */
+{ id:"DIVE", name:"Dive Bomb", grp:2, dur:1.15,
+  use:"Head-down plunge that accelerates. Trades all control for closing speed.",
+  f(p){
+    const r = R();
+    arm(r,"L", .22, .62, -1);                               /* arms pinned along the body */
+    arm(r,"R",-.22, .60,  1);
+    leg(r,"L", -.08, 1.55, -1);
+    leg(r,"R",  .08, 1.53, -1);
+    return { rig:r, rot:3.02 + .05*Math.sin(p*TAU*2), x:.06*Math.sin(p*TAU*2), y:3.9 - 3.6*eIn(p),
+      fx(c,E){
+        const u = E.unit, i = .3 + eIn(p);
+        speed(c, E, 3.02, 22, { rate:8, reach:8, spread:1.7, alpha:.55*i, len:3.6 });
+        c.save();                                            /* air torn open at the head */
+        c.globalAlpha = .8; c.strokeStyle = IK; c.lineWidth = u*.045;
+        const tip = [E.cx, E.cy + u*2.9];
+        c.beginPath();
+        c.moveTo(tip[0] - u*.95, tip[1] - u*1.5);
+        c.quadraticCurveTo(tip[0], tip[1] - u*.2, tip[0] + u*.95, tip[1] - u*1.5);
+        c.stroke(); c.restore();
+      } };
+  } },
+
+{ id:"METEOR", name:"Meteor Slam", grp:2, dur:1.7,
+  use:"Air-to-ground finisher. Rises to load, drives down fists-first, cracks the floor.",
+  f(p){
+    const r = R();
+    const rise = seg(p,0,.28), fall = seg(p,.28,.58), hold = seg(p,.58,.76), up = seg(p,.76,1);
+    let Y, rot;
+    if(p < .28){        Y = 3.1 + .55*eOut(rise);      rot = -.30*eOut(rise); }
+    else if(p < .58){   Y = lerp(3.65, -.52, eIn(fall)); rot = lerp(-.30, 2.86, eIO(fall)); }
+    else if(p < .76){   Y = -.52 + .10*eOut(hold);     rot = lerp(2.86, TAU + .34, eOut(hold)); }
+    else {              Y = lerp(-.42, .55, eOut(up)); rot = lerp(TAU + .34, TAU, eOut(up)); }
+
+    if(p < .58){                                            /* both fists overhead, then ahead of the dive */
+      arm(r,"L",  .16, -2.30, 1);
+      arm(r,"R", -.16, -2.28, -1);
+      leg(r,"L", -.10, 1.52, -1);
+      leg(r,"R",  .10, 1.50, -1);
+    }else{                                                  /* driven into the floor */
+      const g = FLOOR(Y);
+      arm(r,"L",  .42, g, 1);
+      arm(r,"R",  .10, g, -1);
+      leg(r,"L", -.30, g, -1);
+      leg(r,"R",  .40, g, -1);
+      r.nose = [.24,-1.14];
+    }
+    return { rig:r, rot, x:0, y:Y, glow:p > .30 && p < .62,
+      fx(c,E){
+        const u = E.unit;
+        if(p < .28) speed(c, E, Math.PI/2, 8, { rate:2, reach:3, alpha:.3 });
+        if(p > .34 && p < .58) speed(c, E, 2.86, 18, { rate:9, reach:7, spread:1.6, alpha:.6, len:3 });
+        if(p > .58){
+          const k = seg(p,.58,.92);
+          burst(c, E, [E.cx, E.ground], u*(1.0 + 2.6*eOut(k)), 12);
+          ring(c, E, [E.cx, E.ground], u*(.6 + 4.2*eOut(k)), { flat:.22, alpha:.75*(1-k), w:.06 });
+          cracks(c, E, E.cx, u*2.6, .9*(1-k*.7));
+          dust(c, E, E.cx, u*(1 + 3*eOut(k)), .85*(1-k));
+        }
+      } };
+  } },
+
+{ id:"KNEE", name:"Flying Knee", grp:2, dur:1.25,
+  use:"Fast horizontal closer. Cheap to throw, so the knee is the only hitbox.",
+  f(p){
+    const r = R();
+    const go = eOut(seg(p,.05,.72));
+    r.knL = [.32,.14]; r.anL = [.14,.66];                   /* lead knee driven to the chest */
+    leg(r,"R", -.28, 1.55, -1);
+    arm(r,"L", -.52, .16, 1);                               /* both arms wrenched back */
+    arm(r,"R", -.72, -.06, -1);
+    r.nose = [.16,-1.24];
+    return { rig:r, rot:1.02 + .05*Math.sin(p*TAU), x:-2.5 + 5.0*go, y:2.2 + .35*Math.sin(p*Math.PI),
+      glow:p > .52 && p < .70,
+      fx(c,E){
+        const u = E.unit;
+        speed(c, E, 1.02, 14, { rate:5, reach:5.5, spread:1.9, alpha:.45*(1-seg(p,.72,1)) });
+        if(p > .52 && p < .72){
+          const k = seg(p,.52,.72);
+          const at = [E.cx + u*1.05, E.cy - u*.30];
+          burst(c, E, at, u*(.7 + 1.5*eOut(k)), 9);
+          ring(c, E, at, u*(.4 + 1.8*eOut(k)), { alpha:.7*(1-k), w:.055 });
+        }
+      } };
+  } },
+
+{ id:"SPIN", name:"Air Spin Kick", grp:2, dur:1.3,
+  use:"Cartwheels through the arc with one leg out. Hits on every pass, so it clears crowds.",
+  f(p){
+    const r = R();
+    leg(r,"L", 1.36, .42, -1);                              /* extended kicking leg */
+    r.knR = [.16,.52]; r.anR = [-.10,.84];                  /* other tucked out of the way */
+    arm(r,"L", -.26,-.62, 1);
+    arm(r,"R",  .26,-.56, -1);
+    r.nose = [.14,-1.20];
+    return { rig:r, rot:-p*TAU, x:-1.9 + 3.8*p, y:2.25 + .55*Math.sin(p*Math.PI),
+      glow:true,
+      fx(c,E){
+        const a0 = -p*TAU - .5;                             /* crescent trailing the foot */
+        sweep(c, E, [E.cx, E.cy], E.unit*1.55, a0 - 1.5, a0 + .35, .26);
+      } };
+  } },
+
+{ id:"DRILL", name:"Corkscrew Drill", grp:2, dur:1.1,
+  use:"Rolls about the travel axis while charging. Beats guards that only cover one side.",
+  f(p){
+    const r = R();
+    arm(r,"L",  .14, -2.30, 1);
+    arm(r,"R", -.14, -2.28, -1);
+    leg(r,"L", -.10, 1.53, -1);
+    leg(r,"R",  .10, 1.51, -1);
+    return { rig:r, rot:1.53, x:0, y:2.3, squash:Math.cos(p*TAU*2), glow:true,
+      fx(c,E){
+        const u = E.unit;
+        speed(c, E, 1.53, 20, { rate:8, reach:8, spread:1.4, alpha:.5, len:3.4 });
+        c.save();                                            /* helix wrapping the axis */
+        c.strokeStyle = IK; c.lineWidth = u*.035; c.globalAlpha = .55;
+        for(let s = -1; s <= 1; s += 2){
+          c.beginPath();
+          for(let i = 0; i <= 46; i++){
+            const t = i/46;
+            const px = E.cx - u*3.4 + t*u*6.4;
+            const py = E.cy + Math.sin(t*TAU*1.6 + p*TAU*2 + (s > 0 ? 0 : Math.PI)) * u*1.05;
+            i ? c.lineTo(px,py) : c.moveTo(px,py);
+          }
+          c.stroke();
+        }
+        c.restore();
+      } };
+  } },
+
+{ id:"SHORYU", name:"Rising Uppercut", grp:2, dur:1.4,
+  use:"Anti-air from the floor. Invulnerable on the way up, helpless on the way down.",
+  f(p){
+    const r = R();
+    const load = seg(p,0,.20), go = seg(p,.20,.60), fallP = seg(p,.60,1);
+    let Y, rot;
+    if(p < .20){      Y = -.34*eOut(load);           rot = .16*eOut(load); }
+    else if(p < .60){ Y = lerp(-.34, 3.30, eOut(go)); rot = lerp(.16, -.52, eOut(go)); }
+    else {            Y = 3.30 - 3.30*eIn(fallP);    rot = lerp(-.52, 0, fallP); }
+
+    if(p < .20){
+      const g = FLOOR(Y);
+      leg(r,"L", -.20, g, -1); leg(r,"R", .26, g, -1);
+      arm(r,"L", -.50, .18, 1); arm(r,"R", .38, -.62, -1);
+    }else{
+      const t = eOut(go);
+      arm(r,"L", lerp(-.50,.20,t), lerp(.18,-2.34,t), 1);
+      arm(r,"R", .40, -.30, -1);
+      r.knL = [.24,.46]; r.anL = [.30,1.02];                /* lead knee up, back leg trailing */
+      leg(r,"R", -.18, 1.52, -1);
+    }
+    r.nose[0] += .10;
+    return { rig:r, rot, x:.35*eOut(go), y:Y, glow:p > .20 && p < .62,
+      fx(c,E){
+        const u = E.unit;
+        if(p > .18 && p < .40) dust(c, E, E.cx, u*(.4 + 1.8*seg(p,.18,.40)), 1 - seg(p,.18,.40));
+        if(p > .20 && p < .70){
+          const k = seg(p,.20,.70);
+          sweep(c, E, [E.cx - u*.3, E.cy + u*1.4], u*2.4, -Math.PI*.92, -Math.PI*.92 + 1.15*eOut(k), .22);
+          speed(c, E, -Math.PI/2, 14, { rate:7, reach:5.5, spread:1.4, alpha:.45*(1-k) });
+        }
+      } };
+  } },
+
+/* ---------------- 3 · CONTROL & EVASION ---------------- */
+{ id:"BRAKE", name:"Air Brake", grp:3, dur:1.5,
+  use:"Kills cruise momentum in one beat. Without it, flight reads as a launch, not a vehicle.",
+  f(p){
+    const r = R();
+    const run = seg(p,0,.34), stop = seg(p,.34,.58), calm = seg(p,.58,1);
+    let X, rot;
+    if(p < .34){      X = lerp(-2.4, .55, run);   rot = 1.50; }
+    else if(p < .58){ X = lerp(.55, 1.05, eOut(stop)); rot = lerp(1.50, -.44, eOut(stop)); }
+    else {            X = lerp(1.05, .88, eOut(calm)); rot = lerp(-.44, -.06, eOut(calm)); }
+
+    if(p < .34){
+      arm(r,"L", .08, -2.30, 1); arm(r,"R", .30, .58, -1);
+      leg(r,"L", -.12, 1.52, -1); leg(r,"R", .14, 1.50, -1);
+    }else{
+      const t = eOut(stop) * (1 - calm*.55);
+      arm(r,"L", lerp(.08,-1.42,t), lerp(-2.30,-.62,t), 1);  /* arms flare to catch the air */
+      arm(r,"R", lerp(.30, 1.38,t), lerp(.58,-.66,t), -1);
+      leg(r,"L", lerp(-.12,-.72,t), lerp(1.52,1.16,t), -1);  /* legs kick out front */
+      leg(r,"R", lerp(.14,-.44,t), lerp(1.50,1.30,t), -1);
+    }
+    return { rig:r, rot, x:X, y:2.3 + .10*Math.sin(p*TAU),
+      fx(c,E){
+        const u = E.unit;
+        if(p < .40) speed(c, E, 1.50, 16, { rate:6, reach:6.5, alpha:.5*(1-seg(p,.28,.40)) });
+        if(p > .34 && p < .70){
+          const k = seg(p,.34,.70);
+          c.save(); c.strokeStyle = IK; c.lineWidth = u*.05; c.globalAlpha = .8*(1-k);
+          for(let i = 0; i < 3; i++){                         /* air stacking up in front */
+            const rr = u*(.9 + i*.55 + k*1.5);
+            c.beginPath();
+            c.arc(E.cx + u*.9, E.cy, rr, -.85, .85);
+            c.stroke();
+          }
+          c.restore();
+        }
+      } };
+  } },
+
+{ id:"TUMBLE", name:"Tumble Roll", grp:3, dur:1.1,
+  use:"Tucked 360 that slides sideways. The cheap i-frame dodge, spendable mid-combo.",
+  f(p){
+    const r = R();
+    r.knL = [.26,.40]; r.anL = [.06,.86];                    /* everything pulled to the chest */
+    r.knR = [-.18,.46]; r.anR = [-.02,.90];
+    r.elL = [-.42,-.42]; r.wrL = [.14,.30];
+    r.elR = [ .40,-.38]; r.wrR = [-.14,.26];
+    r.nose = [.30,-1.12];
+    return { rig:r, rot:p*TAU, x:-2.2 + 4.4*eIO(p), y:2.35 + .40*Math.sin(p*TAU),
+      fx(c,E){
+        const u = E.unit;
+        c.save(); c.strokeStyle = IK; c.lineWidth = u*.04; c.globalAlpha = .4;
+        c.beginPath(); c.arc(E.cx, E.cy, u*1.35, p*TAU - 2.5, p*TAU - .6); c.stroke();
+        c.restore();
+        speed(c, E, 0, 8, { rate:3.5, reach:4, spread:1.6, alpha:.3 });
+      } };
+  } },
+
+{ id:"BLINK", name:"Afterimage Blink", grp:3, dur:1.6,
+  use:"Instant reposition. The ghosts are the whole tell — without them it reads as a teleport bug.",
+  f(p){
+    const r = R();
+    const out = seg(p,.30,.42), back = seg(p,.74,.86);
+    const dashing = (p > .30 && p < .42) || (p > .74 && p < .86);
+    const X = p < .30 ? -1.7
+            : p < .42 ? lerp(-1.7, 1.7, eIO(out))
+            : p < .74 ? 1.7
+            : p < .86 ? lerp(1.7, -1.7, eIO(back)) : -1.7;
+    const dir = p < .58 ? 1 : -1;
+    if(dashing){                                             /* streamlined for the snap */
+      arm(r,"L", .10*dir, -2.26, 1);
+      arm(r,"R", -.40*dir, .30, -1);
+      leg(r,"L", -.14*dir, 1.52, -1);
+      leg(r,"R",  .12*dir, 1.50, -1);
+    }else{
+      const w = Math.sin(p*TAU*2);
+      arm(r,"L", -.44, -1.28 + w*.03, 1);                    /* back to a hovering guard */
+      arm(r,"R",  .40, -1.24 - w*.03, -1);
+      leg(r,"L", -.32, 1.24, -1);
+      leg(r,"R",  .28, 1.18, -1);
+    }
+    const ghosts = [];
+    if(dashing){
+      const k = p < .58 ? out : back;
+      const from = p < .58 ? -1.7 : 1.7, to = -from;
+      for(let i = 1; i <= 4; i++){
+        const kk = Math.max(0, k - i*.16);
+        ghosts.push({ x:lerp(from, to, eIO(kk)), alpha:.30 - i*.06 });
+      }
+    }
+    return { rig:r, rot:dashing ? 1.30*dir : -.05, x:X, y:2.15, ghosts,
+      fx(c,E){
+        const u = E.unit;
+        if(p > .28 && p < .50){
+          const k = seg(p,.28,.50);
+          ring(c, E, [E.cx0 - u*1.7, E.cy], u*(.4 + 1.6*k), { alpha:.6*(1-k), w:.05 });
+        }
+        if(p > .72 && p < .94){
+          const k = seg(p,.72,.94);
+          ring(c, E, [E.cx0 + u*1.7, E.cy], u*(.4 + 1.6*k), { alpha:.6*(1-k), w:.05 });
+        }
+      } };
+  } },
+
+/* ---------------- 4 · LANDING ---------------- */
+{ id:"LAND", name:"Superhero Landing", grp:4, dur:1.8,
+  use:"Ends any flight state. Deep compression sells the height the fighter just gave back.",
+  f(p){
+    const r = R();
+    const fall = seg(p,0,.34), hit = seg(p,.34,.44), hold = seg(p,.44,.66), rise = seg(p,.66,1);
+    let Y, rot;
+    if(p < .34){      Y = lerp(3.7, .85, eIn(fall)); rot = -.10; }
+    else if(p < .44){ Y = lerp(.85, -.72, eOut(hit)); rot = lerp(-.10, .12, hit); }
+    else if(p < .66){ Y = -.72 + .04*eOut(hold);      rot = .12; }
+    else {            Y = lerp(-.68, 0, eOut(rise));  rot = lerp(.12, 0, eOut(rise)); }
+    const g = FLOOR(Y);
+
+    if(p < .34){                                             /* gathered on the way down */
+      const t = eIn(fall);
+      leg(r,"L", lerp(-.14,-.34,t), lerp(1.52,1.32,t), -1);
+      leg(r,"R", lerp( .14, .30,t), lerp(1.50,1.30,t), -1);
+      arm(r,"L", -1.20, -1.10, 1);
+      arm(r,"R",  1.16, -1.06, -1);
+    }else{
+      const t = p < .44 ? eOut(hit) : (p < .66 ? 1 : 1 - eOut(rise));
+      leg(r,"L", lerp(-.20, .64, t), lerp(1.30, g, t), -1);  /* front foot planted forward */
+      r.knR = [lerp(.26, .10, t), lerp(.72, g, t)];          /* back knee down on the floor */
+      r.anR = [lerp(.24,-.60, t), lerp(1.42, g, t)];
+      r.neck = [lerp(0,.30,t), lerp(-1.0,-.84,t)];           /* torso pitched over the fist */
+      r.shL  = [lerp(-.40,-.04,t), lerp(-1.0,-.90,t)];
+      r.shR  = [lerp( .40, .64,t), lerp(-1.0,-.78,t)];
+      r.nose = [lerp(0,.56,t), lerp(-1.28,-1.02,t)];
+      arm(r,"L", lerp(-.34,.34,t), lerp(-1.02, g, t), 1);    /* lead fist driven at the floor */
+      arm(r,"R", lerp( .34,1.28,t), lerp(-1.02,-.30, t), -1);
+    }
+    return { rig:r, rot, x:0, y:Y,
+      fx(c,E){
+        const u = E.unit;
+        if(p < .36) speed(c, E, Math.PI/2, 12, { rate:6, reach:5, alpha:.45*eIn(fall) });
+        if(p > .34){
+          const k = seg(p,.34,.80);
+          ring(c, E, [E.cx, E.ground], u*(.5 + 3.4*eOut(k)), { flat:.20, alpha:.8*(1-k), w:.05 });
+          dust(c, E, E.cx, u*(.7 + 2.6*eOut(k)), .9*(1-k));
+          cracks(c, E, E.cx + u*.3, u*1.9, .8*(1-k));
+          if(p < .48) burst(c, E, [E.cx + u*.3, E.ground], u*(.6 + 1.4*seg(p,.34,.48)), 8);
+        }
+      } };
+  } }
+];
+
+/* ============================================================
+   5. SURFACE — one rAF drives the stage and the contact sheet
+   ============================================================ */
+function ctxOf(cv){
+  const r = cv.getBoundingClientRect();
+  if(!r.width || !r.height) return null;
+  const d = Math.min(devicePixelRatio || 1, 2);
+  const W = Math.round(r.width*d), H = Math.round(r.height*d);
+  if(cv.width !== W || cv.height !== H){ cv.width = W; cv.height = H; }
+  const c = cv.getContext("2d");
+  c.setTransform(d,0,0,d,0,0);
+  return { c, w:r.width, h:r.height };
+}
+
+/* the arena floor, plus an altitude ruler because these are flight moves */
+function backdrop(c, w, h, ground, unit, ruler){
+  c.fillStyle = "#FFF"; c.fillRect(0,0,w,h);
+  c.fillStyle = "#F5F5F5"; c.fillRect(0, 0, w, ground);
+  c.strokeStyle = IK; c.lineWidth = 2;
+  c.beginPath(); c.moveTo(0, ground); c.lineTo(w, ground); c.stroke();
+  c.strokeStyle = "#D8D8D8"; c.lineWidth = 1;
+  for(let i = 1; i < 10; i++){
+    const x = w*i/10;
+    c.beginPath(); c.moveTo(x, ground); c.lineTo(x, ground + h*.05); c.stroke();
+  }
+  if(!ruler) return;
+  c.strokeStyle = "#D8D8D8"; c.lineWidth = 1;
+  c.fillStyle = "#A0A0A0";
+  c.font = "10px " + "Consolas, monospace";
+  c.textBaseline = "middle";
+  for(let u = 0; u <= 5; u++){
+    const y = ground - u*unit;
+    if(y < 14) break;
+    c.globalAlpha = u ? .9 : 0;
+    c.beginPath(); c.moveTo(30, y); c.lineTo(w, y); c.stroke();
+    c.globalAlpha = 1;
+    c.fillText(u + "u", 8, y);
+  }
+}
+
+function shot(m, p){
+  const s = m.f(clamp(p, 0, .9999));
+  fixBones(s.rig);
+  s.rot = s.rot || 0; s.x = s.x || 0; s.y = s.y || 0;
+  s.facing = s.facing == null ? 1 : s.facing;
+  s.squash = s.squash == null ? 1 : s.squash;
+  return s;
+}
+
+/* one motion rendered into one canvas */
+function render(cv, m, p, opt){
+  const g = ctxOf(cv); if(!g) return null;
+  const { c, w, h } = g;
+  const unit = h*opt.unit, ground = h*opt.ground;
+  backdrop(c, w, h, ground, unit, opt.ruler);
+
+  const s = shot(m, p);
+  const cx0 = w/2, cx = cx0 + s.x*unit;
+  const cy = ground - (1.42 + s.y)*unit;
+  const E = { c, w, h, unit, ground, cx, cy, cx0, p, t:opt.t,
+              rot:s.rot, facing:s.facing };
+
+  if(opt.trail){                                   /* echo of where the body just was */
+    for(let i = 5; i >= 1; i--){
+      const q = p - i*.020;
+      if(q < 0) continue;
+      const t = shot(m, q);
+      drawFighter(c, t.rig, cx0 + t.x*unit, ground - (1.42 + t.y)*unit, unit,
+        t.facing, { rot:t.rot, squash:t.squash, alpha:.10 - i*.012 });
+    }
+  }
+  if(s.ghosts) s.ghosts.forEach(gh => {
+    drawFighter(c, s.rig, cx0 + gh.x*unit, cy, unit, s.facing,
+      { rot:s.rot, squash:s.squash, alpha:gh.alpha });
+  });
+  if(opt.fx && s.fx) s.fx(c, E);
+  drawFighter(c, s.rig, cx, cy, unit, s.facing,
+    { rot:s.rot, squash:s.squash, glow:s.glow && opt.fx, bones:opt.bones });
+  return s;
+}
+
+/* ---------- build the contact sheet ---------- */
+const sheet = document.getElementById("sheet");
+const cards = [];
+GROUPS.forEach((grp, gi) => {
+  const list = MOTIONS.filter(m => m.grp === gi);
+  const sec = document.createElement("section");
+  sec.className = "grp";
+  const head = document.createElement("div");
+  head.className = "grp-h";
+  head.innerHTML = '<span class="grp-n"></span><span class="grp-d"></span><span class="grp-c"></span>';
+  head.children[0].textContent = grp.n;
+  head.children[1].textContent = grp.d;
+  head.children[2].textContent = String(list.length).padStart(2,"0") + " MOVES";
+  sec.appendChild(head);
+  const wrapEl = document.createElement("div");
+  wrapEl.className = "sheet";
+  list.forEach(m => {
+    const i = MOTIONS.indexOf(m);
+    const b = document.createElement("button");
+    b.className = "card"; b.type = "button";
+    b.innerHTML = '<canvas></canvas><div class="card-t">' +
+      '<div class="card-i"></div><div class="card-n"></div><div class="card-u"></div></div>';
+    b.querySelector(".card-i").textContent = String(i+1).padStart(2,"0");
+    b.querySelector(".card-n").textContent = m.name;
+    b.querySelector(".card-u").textContent = m.use;
+    b.addEventListener("click", () => pick(i));
+    wrapEl.appendChild(b);
+    cards.push({ el:b, cv:b.querySelector("canvas"), m, i });
+  });
+  sec.appendChild(wrapEl);
+  sheet.appendChild(sec);
+});
+
+/* ---------- state + controls ---------- */
+const S = { i:0, t:0, p:0, play:true, speed:1, trail:false, fx:true, bones:false };
+const SPEEDS = [1, .5, .25, 1.5];
+let si = 0;
+
+const $ = s => document.querySelector(s);
+const stageCv = $("#stage");
+
+function pick(i){
+  S.i = ((i % MOTIONS.length) + MOTIONS.length) % MOTIONS.length;
+  S.p = 0;
+  const m = MOTIONS[S.i];
+  $("#pIdx").textContent = String(S.i+1).padStart(2,"0") + " / " + MOTIONS.length;
+  $("#pName").textContent = m.name;
+  $("#pUse").textContent = m.use;
+  $("#roD").textContent = m.dur.toFixed(2) + "s";
+  $("#tagPhase").textContent = GROUPS[m.grp].n.toUpperCase();
+  cards.forEach(cd => cd.el.classList.toggle("on", cd.i === S.i));
+}
+function toggle(btn, key){
+  btn.addEventListener("click", () => {
+    S[key] = !S[key];
+    btn.classList.toggle("on", S[key]);
+  });
+  btn.classList.toggle("on", S[key]);
+}
+toggle($("#bTrail"), "trail");
+toggle($("#bFx"), "fx");
+toggle($("#bRig"), "bones");
+$("#bPrev").addEventListener("click", () => pick(S.i - 1));
+$("#bNext").addEventListener("click", () => pick(S.i + 1));
+$("#bPlay").addEventListener("click", () => {
+  S.play = !S.play;
+  $("#bPlay").textContent = S.play ? "Pause" : "Play";
+  $("#tagState").textContent = S.play ? "PLAYING" : "PAUSED";
+});
+$("#bSpeed").addEventListener("click", () => {
+  si = (si + 1) % SPEEDS.length;
+  S.speed = SPEEDS[si];
+  $("#bSpeed").textContent = "Speed " + S.speed.toFixed(2).replace(/0$/,"") + "×";
+});
+const bar = $("#bar");
+const scrubTo = e => {
+  const r = bar.getBoundingClientRect();
+  S.p = clamp((e.clientX - r.left)/r.width, 0, .9999);
+};
+bar.addEventListener("pointerdown", e => {
+  bar.setPointerCapture(e.pointerId);
+  S.play = false; $("#bPlay").textContent = "Play"; $("#tagState").textContent = "SCRUBBING";
+  scrubTo(e);
+});
+bar.addEventListener("pointermove", e => { if(e.buttons) scrubTo(e); });
+
+addEventListener("keydown", e => {
+  const k = e.key;
+  if(k === " "){ e.preventDefault(); $("#bPlay").click(); }
+  else if(k === "ArrowRight"){ e.preventDefault(); S.play = false; $("#bPlay").textContent = "Play"; S.p = (S.p + .02) % 1; }
+  else if(k === "ArrowLeft"){ e.preventDefault(); S.play = false; $("#bPlay").textContent = "Play"; S.p = (S.p - .02 + 1) % 1; }
+  else if(k === "ArrowDown"){ e.preventDefault(); pick(S.i + 1); }
+  else if(k === "ArrowUp"){ e.preventDefault(); pick(S.i - 1); }
+});
+
+/* ---------- loop ---------- */
+let last = performance.now(), frame = 0;
+function tick(now){
+  const dt = Math.min(.05, (now - last)/1000); last = now;
+  S.t += dt;
+  const m = MOTIONS[S.i];
+  if(S.play) S.p = (S.p + dt*S.speed/m.dur) % 1;
+
+  const s = render(stageCv, m, S.p,
+    { unit:.115, ground:.88, ruler:true, t:S.t, trail:S.trail, fx:S.fx, bones:S.bones });
+  if(s){
+    $("#roP").textContent = Math.round(S.p*100) + "%";
+    $("#roR").textContent = Math.round(((s.rot*180/Math.PI) % 360 + 360) % 360) + "°";
+    $("#roY").textContent = s.y.toFixed(1) + "u";
+    $("#barF").style.width = (S.p*100) + "%";
+    $("#barM").style.left = (S.p*100) + "%";
+  }
+
+  /* cards run at half rate — 18 loops at full speed buys nothing */
+  if((frame++ & 1) === 0){
+    cards.forEach(cd => {
+      const r = cd.cv.getBoundingClientRect();
+      if(r.bottom < -60 || r.top > innerHeight + 60) return;
+      render(cd.cv, cd.m, (S.t/cd.m.dur) % 1,
+        { unit:.108, ground:.90, ruler:false, t:S.t, trail:false, fx:true, bones:false });
+    });
+  }
+  requestAnimationFrame(tick);
+}
+pick(0);
+requestAnimationFrame(tick);
+</script>
+</body>
+</html>

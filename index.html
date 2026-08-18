@@ -285,7 +285,7 @@ kbd{font-family:var(--mono); font-size:11px; border:1px solid var(--ink); paddin
   color:var(--grey); border:1px solid var(--rule); padding:8px 12px; max-width:52ch;
 }
 .gate .steps b{color:var(--ink)}
-#tCam{cursor:pointer}
+#tCam,#tMode{cursor:pointer}
 .srow{display:grid; gap:4px}
 .srow .lab{display:flex; justify-content:space-between; align-items:baseline}
 .srow input[type=range]{
@@ -359,6 +359,7 @@ kbd{font-family:var(--mono); font-size:11px; border:1px solid var(--ink); paddin
     <span class="hudstat">XP <b id="tXp">0</b></span>
     <span class="hudstat coin">COINS <b id="tCoins">0</b></span>
     <span class="pill" id="tAcct">SIGNED OUT</span>
+    <span class="pill" id="tMode" title="Switch between camera and keyboard">KEYBOARD</span>
     <span class="pill" id="tCam">CAMERA OFF</span>
   </header>
 
@@ -921,7 +922,29 @@ async function startCamera(){
     $("#oCam").textContent = (st.width||640) + "×" + (st.height||480) +
       (Pose.camFps ? " @" + Pose.camFps : "");
 
+    /* The stream is live, which is all the gate was waiting on. The model
+       is several megabytes and used to be awaited here, so after granting
+       permission the gate simply sat there looking frozen. It now loads in
+       the background while you are already in the game. */
+    Pose.camOn = true;
+    loadTracker(v);
+    return true;
+  }catch(err){
+    Pose.error = err;
+    Pose.running = false; Pose.camOn = false;
+    $("#rCam").textContent = Pose.stream ? "ON" : "BLOCKED";
+    $("#rPose").textContent = "UNAVAILABLE";
+    cta.innerHTML = "<b>" + String(err.message || err) + "</b><br>" +
+      "You can still play on the keyboard while you sort this out.";
+    toast("Camera unavailable — keyboard controls are active.");
+    return false;
+  }
+}
+
+async function loadTracker(v){
+  try{
     $("#rPose").textContent = "LOADING";
+    setGateNote("Camera on. Loading the tracking model…");
     const vision = await import(CDN + "/vision_bundle.mjs");
     const fileset = await vision.FilesetResolver.forVisionTasks(CDN + "/wasm");
     Pose.landmarker = await vision.PoseLandmarker.createFromOptions(fileset, {
@@ -946,23 +969,24 @@ async function startCamera(){
       };
       v.requestVideoFrameCallback(step);
     }
-    $("#rPose").textContent = "ACTIVE";
-
-    /* pose is the only model that loads now: one inference per frame */
+    $("#rPose").textContent = "ACTIVE";       /* tracking is live */
     $("#camCta").classList.add("hide");
-    toast("Camera live. Stand back until your hips are in frame, then Calibrate.");
-    /* calibration now happens automatically as soon as you are in frame */
+    setGateNote("");
+    toast("Tracking live. Stand back until your hips are in frame.");
   }catch(err){
     Pose.error = err;
     Pose.running = false;
-    $("#rCam").textContent = Pose.stream ? "ON" : "BLOCKED";
     $("#rPose").textContent = "UNAVAILABLE";
-    cta.innerHTML = "<b>" + String(err.message || err) + "</b><br>" +
-      "Fights need the camera, so fix this and try again.";
-    toast("Camera unavailable — fights are locked until it works.");
+    setGateNote("The tracking model could not load. Keyboard controls still work.");
+    toast("Tracking model failed to load — keyboard controls are active.");
   }
 }
 function setPill(el, t){ el.textContent = t; }
+function setGateNote(t){
+  const a = $("#gateHint"), b = $("#ctaHint");
+  if(a) a.textContent = t;
+  if(b && t) b.textContent = t;
+}
 
 function stopCamera(){
   Pose.running = false;
@@ -2703,6 +2727,25 @@ $("#tgFace").addEventListener("click", () => {
 $("#btnMirror").addEventListener("click", toggleMirror);
 $("#btnPauseMirror").addEventListener("click", toggleMirror);
 $("#pipBox").addEventListener("click", toggleMirror);
+/* Keyboard mode was a one-way door: choosing it at the gate stuck, with
+   nothing anywhere to switch back. The top-bar pill now toggles it. */
+function paintMode(){
+  const el = $("#tMode"); if(!el) return;
+  const kb = P.inputMode === "keyboard";
+  const tracking = Pose.running && Pose.cal;
+  el.textContent = kb ? "KEYBOARD MODE" : tracking ? "CAMERA MODE" : "CAMERA (WAITING)";
+  el.classList.toggle("on", !kb && tracking);
+}
+function toggleInputMode(){
+  if(P.inputMode === "keyboard"){
+    P.inputMode = "auto"; save(); paintMode();
+    if(!Pose.camOn){ openGate(); toast("Switching to camera — turn it on to play with your body."); }
+    else toast("Camera mode. Your movements drive the fighter.");
+  }else{
+    P.inputMode = "keyboard"; save(); paintMode();
+    toast("Keyboard mode. Mouse aims, click punches, WASD moves.");
+  }
+}
 function applyMirror(){
   $("#cam").classList.toggle("mirror", Pose.mirror);
   $("#pipCam").classList.toggle("mirror", Pose.mirror);
@@ -2920,6 +2963,7 @@ function frame(now){
   if(dt > .1) dt = .1;
   poseTick(dt);
   pollKeyboard();
+  paintMode();
   refreshGates();
   if(toastT > 0){ toastT -= dt; if(toastT <= 0) $("#toast").classList.remove("show"); }
   if(Screen.now === "setup"){ drawOverlay($("#overlay")); paintSetup(); }
@@ -3027,6 +3071,7 @@ function setAuthMode(m){
 $("#tabIn").addEventListener("click", () => setAuthMode("login"));
 $("#tabUp").addEventListener("click", () => setAuthMode("register"));
 $("#tAcct").addEventListener("click", () => go("account"));
+$("#tMode").addEventListener("click", toggleInputMode);
 
 $("#btnAuth").addEventListener("click", async () => {
   if(Cloud.busy) return;
@@ -3102,11 +3147,10 @@ async function cameraPermission(){
 async function runGateStart(){
   $("#gateStart").disabled = true;
   $("#gateHint").textContent = "Waiting for your browser to allow the camera…";
-  await startCamera();
-  if(Pose.running){
-    closeGate();
-    toast(Pose.cal ? "Camera live — your saved calibration is loaded."
-                   : "Camera live. Stand in frame and it will calibrate itself.");
+  const ok = await startCamera();
+  if(ok){ closeGate();
+    P.inputMode = "auto"; save(); paintMode();
+    toast("Camera on. Tracking model is still loading in the background.");
   }else{
     $("#gateStart").disabled = false;
     $("#gateStart").textContent = "Try again";
@@ -3119,9 +3163,7 @@ async function bootCamera(){
   if(state === "granted"){
     $("#gateTitle").textContent = "Starting your camera";
     $("#gateHint").textContent = "Already allowed on this device.";
-    $("#gateStart").disabled = true;
-    await runGateStart();
-    return;
+    await runGateStart(); return;
   }
   if(state === "denied"){
     $("#gateTitle").textContent = "Your browser is blocking the camera";
@@ -3140,6 +3182,7 @@ $("#tCam").addEventListener("click", openGate);
 addEventListener("keydown", e => { if(e.key === "Escape" && gateEl.classList.contains("on")) closeGate(); });
 
 cloudBoot();
+paintMode();
 bootCamera();
 requestAnimationFrame(frame);
 </script>
