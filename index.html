@@ -836,7 +836,7 @@ const Pose = {
   cal:null, action:"—", lastSpeed:0,
   hander:null, facer:null, handsOn:true, faceOn:true,
   hands:{ L:null, R:null }, face:null, faceSeen:false, mouth:0, tilt:0,
-  handRaw:[], faceRaw:null, faceCenter:null, tick:0,
+  handRaw:[], faceCenter:null, tick:0,
   vel:{ L:{x:0,y:0,v:0}, R:{x:0,y:0,v:0} },
   hold:{}, cooldown:{}, events:[], armed:{ L:true, R:true }
 };
@@ -903,13 +903,7 @@ async function startCamera(){
         });
         setTxt("#rHands", "ACTIVE");
       }catch(e){ setTxt("#rHands", "UNAVAILABLE"); Pose.handsOn = false; }
-      try{
-        Pose.facer = await vision.FaceLandmarker.createFromOptions(fileset, {
-          baseOptions:{ modelAssetPath: FACE_MODEL, delegate:"GPU" },
-          runningMode:"VIDEO", numFaces:1
-        });
-        setTxt("#rFace", "ACTIVE");
-      }catch(e){ setTxt("#rFace", "UNAVAILABLE"); Pose.faceOn = false; }
+      setTxt("#rFace", "FROM POSE");   /* no separate model needed */
     })();
     $("#camCta").classList.add("hide");
     toast("Camera live. Stand back until your hips are in frame, then Calibrate.");
@@ -1099,18 +1093,16 @@ function recognize(dt){
 let lastVideoTime = -1, fpsAcc = 0, fpsN = 0;
 /* Body every frame; fingers and face are cosmetic/zone hints and can lag.
    These back off automatically when the body rate drops. */
-let HAND_EVERY = 3, FACE_EVERY = 8;
+let HAND_EVERY = 1;   /* the face model is gone, so fingers get every frame */
 let resDropped = false;
 function tuneBudget(){
   const f = Pose.realFps;
   if(!f) return;
   /* the body model is what drives the fighter; fingers and face are
      detail. Drop the detail first, and only then the picture size. */
-  Pose.faceAuto = f >= 30;
-  Pose.handAuto = f >= 15;
-  if(f < 18){ HAND_EVERY = 6; FACE_EVERY = 20; }
-  else if(f < 28){ HAND_EVERY = 4; FACE_EVERY = 12; }
-  else { HAND_EVERY = 3; FACE_EVERY = 8; }
+  Pose.handAuto = f >= 12;
+  /* face is free now; only the hand model can still be thinned out */
+  HAND_EVERY = f < 16 ? 3 : f < 24 ? 2 : 1;
 
   if(!resDropped && f < 22 && Pose.stream){
     resDropped = true;
@@ -1169,9 +1161,8 @@ function poseTick(dt){
   if(Pose.handsOn && Pose.handAuto !== false && Pose.hander && Pose.tick % HAND_EVERY === 0){
     try{ readHands(Pose.hander.detectForVideo(v, t0 + 1)); }catch(e){}
   }
-  if(Pose.faceOn && Pose.faceAuto !== false && Pose.facer && Pose.tick % FACE_EVERY === 0){
-    try{ readFace(Pose.facer.detectForVideo(v, t0 + 2)); }catch(e){}
-  }
+  if(Pose.faceOn) readFaceFromPose();
+
 }
 function setTxt(sel, t){ const e = $(sel); if(e) e.textContent = t; }
 
@@ -1201,17 +1192,27 @@ function readHands(res){
 }
 
 /* ---- face ---- */
-function readFace(res){
-  const lm = res && res.faceLandmarks && res.faceLandmarks[0];
-  Pose.faceRaw = lm || null;
-  if(!lm){ Pose.faceSeen = false; return; }
-  Pose.faceSeen = true;
-  const top = lm[10], chin = lm[152], upper = lm[13], lower = lm[14];
-  const faceH = Math.hypot(top.x - chin.x, top.y - chin.y) || .001;
-  Pose.mouth = Math.hypot(upper.x - lower.x, upper.y - lower.y) / faceH;
-  const le = lm[33], re = lm[263];
-  Pose.tilt = Math.atan2(re.y - le.y, re.x - le.x);
-  Pose.faceCenter = { x:(le.x + re.x) / 2, y:(le.y + re.y) / 2, h:faceH };
+/* MediaPipe Pose already returns the face: nose, both eyes, both ears
+   and the mouth corners (landmarks 0-10). Everything the game used the
+   478-point face mesh for — the head line and the tracked-face box — is
+   in there, so we read it straight off the body pass. That deletes an
+   entire model from the frame and the face updates every frame instead
+   of every eighth. */
+const FACE_PTS = [0,1,2,3,4,5,6,7,8,9,10];
+function readFaceFromPose(){
+  const s = Pose.sm;
+  if(!s){ Pose.faceSeen = false; return; }
+  const eyeL = s[2], eyeR = s[5], earL = s[7], earR = s[8];
+  const mouthL = s[9], mouthR = s[10], nose = s[0];
+  const vis = (eyeL.v + eyeR.v + nose.v) / 3;
+  Pose.faceSeen = vis > .5;
+  if(!Pose.faceSeen){ Pose.faceCenter = null; return; }
+  const width = Math.hypot(earL.x - earR.x, earL.y - earR.y) || .001;
+  const faceH = width * 1.35;
+  const mouthMid = { x:(mouthL.x + mouthR.x) / 2, y:(mouthL.y + mouthR.y) / 2 };
+  Pose.mouth = Math.hypot(nose.x - mouthMid.x, nose.y - mouthMid.y) / faceH;
+  Pose.tilt = Math.atan2(eyeR.y - eyeL.y, eyeR.x - eyeL.x);
+  Pose.faceCenter = { x:(eyeL.x + eyeR.x) / 2, y:(eyeL.y + eyeR.y) / 2, h:faceH };
 }
 
 /* ============================================================
@@ -2333,12 +2334,12 @@ function drawOverlay(cv){
   });
 
   /* face mesh: a sparse scatter reads better than 478 dots */
-  if(Pose.faceOn && Pose.faceRaw){
+  if(Pose.faceOn && Pose.faceSeen){
     c.fillStyle = "#000";
-    for(let i = 0; i < Pose.faceRaw.length; i += 6){
-      const pt = Pose.faceRaw[i];
-      c.fillRect(X(pt.x) - 1, Y(pt.y) - 1, 2, 2);
-    }
+    FACE_PTS.forEach(i => {
+      const pt = s[i];
+      if(pt.v > .4) c.fillRect(X(pt.x) - 2, Y(pt.y) - 2, 4, 4);
+    });
     if(Pose.faceCenter){
       const r = Pose.faceCenter.h * h * .78;
       c.strokeStyle = "#FFC800"; c.lineWidth = 3;
@@ -2411,7 +2412,7 @@ $("#tgHands").addEventListener("click", () => {
 });
 $("#tgFace").addEventListener("click", () => {
   Pose.faceOn = $("#tgFace").classList.toggle("on");
-  if(!Pose.faceOn){ Pose.faceRaw = null; Pose.faceSeen = false; }
+  if(!Pose.faceOn){ Pose.faceCenter = null; Pose.faceSeen = false; }
 });
 $("#btnMirror").addEventListener("click", () => {
   Pose.mirror = !Pose.mirror;
