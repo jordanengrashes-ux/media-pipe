@@ -1234,7 +1234,13 @@ function recognize(dt){
   const rawX = Pose.mirror ? 1 - sh.x : sh.x;
   const centerX = Pose.mirror ? 1 - cal.centerX : cal.centerX;
   const gain = 1.0 + P.sensitivity * 2.6;
-  Input.posX = clamp(.5 + (rawX - centerX) * gain, ARENA.left, ARENA.right);
+  /* A small offset from your calibrated centre used to park the fighter
+     off-centre permanently, which reads as walking somewhere on its own.
+     Anything inside a shoulder-width of centre now counts as standing still. */
+  let off = rawX - centerX;
+  const dead = cal.shoulderW * .35;
+  off = Math.abs(off) < dead ? 0 : off - Math.sign(off) * dead;
+  Input.posX = clamp(.5 + off * gain, ARENA.left, ARENA.right);
   Input.posActive = true;
 
   /* JUMP — dip your knees then stand up fast. Your feet never leave the
@@ -1499,6 +1505,9 @@ addEventListener("beforeunload", e => {
 });
 function pollKeyboard(){
   if(Pose.running && Pose.cal) return;          /* tracking owns the stick */
+  Input.posActive = false;   /* the camera set a target once and it was never
+                                cleared, so the fighter kept walking toward
+                                wherever you last stood */
   Input.block  = !!keyState["shift"];
   Input.guard  = keyState["shift"] ? 2 : 0;
   Input.crouch = !!keyState["s"] || !!keyState["c"];
@@ -1529,6 +1538,7 @@ function drainEvents(){
    5. MATCH — fighters, range, damage, rounds, bot AI
    ============================================================ */
 const ARENA = { left:.12, right:.88 };
+const ATTACK_CD = 1.0;        /* seconds between attacks */
 const GRAVITY = 9.0;          /* rig units per second squared */
 const JUMP_V  = 4.2;          /* a launch far past what a person can do */
 
@@ -1936,9 +1946,12 @@ function separate(){
       /* the remote owns its own position, so only we give ground */
       PL.x = clamp(OP.x - MIN_GAP, ARENA.left, ARENA.right);
     }else{
-      const push = (MIN_GAP - (OP.x - PL.x)) / 2;
-      PL.x = clamp(PL.x - push, ARENA.left, ARENA.right - MIN_GAP);
-      OP.x = clamp(PL.x + MIN_GAP, ARENA.left + MIN_GAP, ARENA.right);
+      /* You are the anchor. The bot walking into you used to shove you
+         backwards, which read as drifting on its own. It gives ground
+         instead, and only pushes you once it has a wall behind it. */
+      const want = PL.x + MIN_GAP;
+      if(want <= ARENA.right) OP.x = want;
+      else { OP.x = ARENA.right; PL.x = clamp(ARENA.right - MIN_GAP, ARENA.left, ARENA.right); }
     }
   }
   PL.facing = 1; OP.facing = -1;
@@ -1992,6 +2005,8 @@ function matchTick(dt){
     if(Match.state !== "fight") return;
     if(ev.type === "PUNCH"){
       if(PL.grab){ smashGround(PL, OP); return; }
+      if(PL.atkCd > 0) return;                 /* one attack per second */
+      PL.atkCd = ATTACK_CD;
       if(PL.st < 6){ logHit("NO STAMINA", ""); return; }
       tryAttack(PL, OP, ev);
     }
@@ -2023,6 +2038,8 @@ function matchTick(dt){
     }
     if(ev.type === "KICK"){
       if(PL.st < 10){ logHit("NO STAMINA", ""); return; }
+      if(PL.atkCd > 0) return;
+      PL.atkCd = ATTACK_CD;
       tryAttack(PL, OP, { side:"R", zone: PL.y > .5 ? "HEAD" : "BODY",
                           speed:ev.speed, heavy:true, kick:true });
       return;
@@ -2078,6 +2095,7 @@ function matchTick(dt){
     }else ft.kbx = 0;
     ft.stunLock = Math.max(0, (ft.stunLock || 0) - dt);
     ft.invuln = Math.max(0, (ft.invuln || 0) - dt);
+    ft.atkCd = Math.max(0, (ft.atkCd || 0) - dt);
     ft.dodgeCd = Math.max(0, (ft.dodgeCd || 0) - dt);
     ft.st = Math.min(100, ft.st + dt * 16);
     ft.stun = Math.max(0, ft.stun - dt);
@@ -2342,7 +2360,7 @@ function ctxOf(cv){
    your real proportions regardless of distance from the camera */
 const REST = {
   nose:[0,-1.28], neck:[0,-1.0], shL:[-.40,-1.0], shR:[.40,-1.0],
-  elL:[-.74,-.48], elR:[.74,-.48], wrL:[-.34,-1.02], wrR:[.34,-1.02],
+  elL:[-.58,-.56], elR:[.58,-.56], wrL:[-.27,-1.05], wrR:[.27,-1.05],
   hip:[0,0], hpL:[-.28,0], hpR:[.28,0],
   knL:[-.26,.72], knR:[.26,.72], anL:[-.24,1.42], anR:[.24,1.42]
 };
@@ -2719,15 +2737,19 @@ function drawSelectPreview(t){
 }
 /* Swing one arm so it points at a target given in rig space, keeping the
    character's own bone lengths. */
-function aimArm(r, side, tx, ty){
+function aimArm(r, side, tx, ty, amount){
   const sh = r["sh" + side];
   const upper = BL["sh" + side + ">el" + side], fore = BL["el" + side + ">wr" + side];
   let dx = tx - sh[0], dy = ty - sh[1];
   const d = Math.hypot(dx, dy) || 1;
   const reach = Math.min(d, upper + fore);
   dx /= d; dy /= d;
-  r["el" + side] = [sh[0] + dx * upper, sh[1] + dy * upper];
-  r["wr" + side] = [sh[0] + dx * reach, sh[1] + dy * reach];
+  const el = [sh[0] + dx * upper, sh[1] + dy * upper];
+  const wr = [sh[0] + dx * reach, sh[1] + dy * reach];
+  const k = amount == null ? 1 : clamp(amount, 0, 1);
+  const restEl = r["el" + side], restWr = r["wr" + side];   /* blend toward the guard */
+  r["el" + side] = [lerp(restEl[0], el[0], k), lerp(restEl[1], el[1], k)];
+  r["wr" + side] = [lerp(restWr[0], wr[0], k), lerp(restWr[1], wr[1], k)];
 }
 function drawArena(t){
   const g = ctxOf($("#arena")); if(!g) return;
@@ -2790,7 +2812,13 @@ function drawArena(t){
     const oy = groundY - PL.y * unit;
     const tx = (Mouse.x - rect.left - px) / (unit * PL.facing);
     const ty = (Mouse.y - rect.top - oy) / unit + 1.42;
-    aimArm(pRig, "L", tx, ty); aimArm(pRig, "R", tx, ty);
+    /* Idle, the arms stay in a tucked guard and only lean toward the
+       cursor; they reach out fully while a punch is actually travelling. */
+    const striking = PL.strike && !PL.strike.dead && PL.strike.t < PL.strike.dur;
+    const aimStrength = striking ? 1 : .22;
+    const side = striking ? (PL.strike.side === "L" ? "L" : "R") : null;
+    if(side) aimArm(pRig, side, tx, ty, 1);
+    else { aimArm(pRig, "L", tx, ty, aimStrength); aimArm(pRig, "R", tx, ty, aimStrength); }
   }
   drawCharacter(c, pRig, px, groundY - PL.y * unit, unit, PL.facing,
     { id:PL.f.id, glow: PL.animT > .1, koT: PL.koT, air: PL.y > .05, eye: eyeAim });
