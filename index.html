@@ -742,6 +742,8 @@ kbd{font-family:var(--mono); font-size:11px; border:1px solid var(--ink); paddin
             <div class="kv"><span>Login streak</span><b id="pfLS">0</b></div>
             <div class="kv"><span>Best combo</span><b id="pfC">0</b></div>
             <div class="kv"><span>Fastest punch</span><b id="pfP">&mdash;</b></div>
+            <div class="kv"><span>Free purchases</span><b id="pfInf">ON</b></div>
+            <button class="btn quiet" id="btnInf" style="justify-self:start">Toggle free purchases</button>
             <button class="btn quiet" id="btnReset" style="justify-self:start; margin-top:6px">Reset progress</button>
           </div>
           <div class="card">
@@ -819,10 +821,20 @@ const DEFAULT_SAVE = {
   matches:0, totalDmg:0, onlineWins:0,
   loginStreak:0, lastLogin:"", bestLoginStreak:0,
   inputMode:"auto",
+  infCoins:true,
   abilities:[], hotbar:[null,null,null,null,null,null,null,null,null],
   keybinds:["1","2","3","4","5","6","7","8","9"]
 };
 function xpForLevel(lv){ return 300 + (lv-1)*250; }
+/* Temporary sandbox switch: buy anything without spending. Turn it off in
+   Profile and prices apply again. */
+function coinsLabel(){ return P.infCoins ? "∞" : P.coins.toLocaleString(); }
+function canAfford(n){ return P.infCoins || P.coins >= n; }
+function spendCoins(n){
+  if(P.infCoins) return true;
+  if(P.coins < n) return false;
+  P.coins -= n; return true;
+}
 let P = loadSave();
 function loadSave(){
   try{
@@ -850,8 +862,8 @@ function grant(xp, coins, rp){
 function paintTopbar(){
   $("#tLv").textContent = P.lv;
   $("#tXp").textContent = P.xp + " / " + xpForLevel(P.lv);
-  $("#tCoins").textContent = P.coins.toLocaleString();
-  $("#shopBal").textContent = P.coins.toLocaleString();
+  $("#tCoins").textContent = coinsLabel();
+  $("#shopBal").textContent = coinsLabel();
 }
 
 /* ============================================================
@@ -944,6 +956,13 @@ const ABILITIES = [
   { id:"OVERDRIVE", name:"Overdrive",    cost:1800, cd:25, desc:"Half again the damage for five seconds." }
 ];
 const abilityById = id => ABILITIES.find(a => a.id === id);
+/* How each ability plays in its shop preview. One of a handful of
+   archetypes rather than nine bespoke animations. */
+const AB_MOVE = {
+  DASH:      "dashIn",  BACKSTEP: "dashOut", SWEEP:  "sweep",
+  IRONGUARD: "buff",    HAYMAKER: "strike",  UPPERCUT:"launch",
+  POUND:     "slam",    WIND:     "heal",    OVERDRIVE:"buff"
+};
 const Cool = {};                       /* id -> time it becomes ready again */
 
 function ownsAbility(id){ return (P.abilities || []).indexOf(id) >= 0; }
@@ -3014,6 +3033,11 @@ $("#btnResume").addEventListener("click", togglePause);
 $("#btnHowto").addEventListener("click", () => {
   toast("Step in to reach. Punch fast for damage. Head hits hurt most. Esc pauses.");
 });
+$("#btnInf").addEventListener("click", () => {
+  P.infCoins = !P.infCoins; save(); paintProfile(); paintTopbar();
+  toast(P.infCoins ? "Free purchases on — everything costs nothing."
+                   : "Free purchases off — prices apply again.");
+});
 $("#btnReset").addEventListener("click", () => {
   P = {...DEFAULT_SAVE}; save(); paintProfile(); paintTitle();
   toast("Progress reset.");
@@ -3059,8 +3083,8 @@ function paintRoster(){
   $$("#roster .ftile").forEach(b => b.addEventListener("click", () => {
     const f = byId(b.dataset.f);
     if(!isOwned(f)){
-      if(f.unlock.type === "coins" && canUnlock(f)){
-        P.coins -= f.unlock.cost; P.owned.push(f.id); save();
+      if(f.unlock.type === "coins" && (P.infCoins || canUnlock(f))){
+        spendCoins(f.unlock.cost); P.owned.push(f.id); save();
         toast(f.id + " unlocked.");
       }else{ toast(f.id + " needs " + unlockText(f) + "."); return; }
     }
@@ -3097,8 +3121,63 @@ const SHOP = [
 ];
 let shopCat = 0;
 let bindSlot = -1;
+/* A small looping scene: you on the left, a dummy on the right. */
+const previewGhosts = {};
+function previewFighter(id){
+  if(!previewGhosts[id]) previewGhosts[id] = { f:byId(P.fighter), facing:1, anim:"GUARD",
+    animT:0, stun:0, vx:0, walk:0, ko:false, koT:0, win:false, grounded:true, y:0, guard:0 };
+  previewGhosts[id].f = byId(P.fighter);
+  return previewGhosts[id];
+}
+function drawMovePreview(cv, id, time){
+  const g = ctxOf(cv); if(!g) return;
+  const { c, w, h } = g;
+  c.clearRect(0,0,w,h);
+  c.fillStyle = "#F5F5F5"; c.fillRect(0,0,w,h);
+  const groundY = h * .88, unit = h * .27;
+  c.strokeStyle = "#000"; c.lineWidth = 2;
+  c.beginPath(); c.moveTo(0, groundY); c.lineTo(w, groundY); c.stroke();
+
+  const kind = AB_MOVE[id] || "strike";
+  const t = (time % 2.2) / 2.2;                     /* one loop every 2.2s */
+  const hit = t > .35 && t < .55;
+  const me = previewFighter(id);
+  const foe = { f:byId(P.fighter), facing:-1, anim:"GUARD", animT:0, stun:0, vx:0,
+                walk:0, ko:false, koT:0, win:false, grounded:true, y:0, guard:0 };
+
+  let mx = w * .34, fx = w * .70, my = 0, fy = 0, showFoe = true;
+  const swing = Math.sin(clamp((t - .3) / .25, 0, 1) * Math.PI);
+
+  if(kind === "dashIn"){ mx = w * (.20 + .34 * clamp(t / .5, 0, 1)); }
+  else if(kind === "dashOut"){ mx = w * (.46 - .28 * clamp(t / .5, 0, 1)); }
+  else if(kind === "buff" || kind === "heal"){ showFoe = false; mx = w * .5; }
+  else if(kind === "slam"){ my = 1.6 * (1 - clamp(t / .35, 0, 1)); if(hit) fy = 1.2 * swing; }
+  else if(kind === "launch"){ if(t > .35) fy = 2.0 * Math.sin(clamp((t - .35) / .5, 0, 1) * Math.PI); }
+  else if(kind === "sweep"){ if(t > .4) fy = .5 * swing; }
+  else if(kind === "strike"){ if(hit) fx = w * (.70 + .10 * swing); }
+
+  me.y = my; me.grounded = my <= .01;
+  me.anim = (kind === "buff" || kind === "heal") ? "GUARD"
+          : (t > .3 && t < .6) ? "PUNCH_R" : "GUARD";
+  me.animT = me.anim === "PUNCH_R" ? .12 : 0;
+  foe.y = fy; foe.grounded = fy <= .01;
+  foe.stun = fy > .05 ? .3 : 0;
+
+  if(showFoe) drawCharacter(c, animRig(foe, time), fx, groundY - fy * unit, unit, -1,
+    { id:foe.f.id, koT:0 });
+  drawCharacter(c, animRig(me, time), mx, groundY - my * unit, unit, 1,
+    { id:me.f.id, glow: me.anim === "PUNCH_R" || kind === "buff", koT:0 });
+
+  if(kind === "heal" && t > .2){
+    c.fillStyle = "#FFC800"; c.strokeStyle = "#000"; c.lineWidth = 2;
+    for(let i = 0; i < 3; i++){
+      const yy = groundY - unit * (1.6 + i * .5) - (t * 30);
+      c.beginPath(); c.arc(mx + (i - 1) * unit * .3, yy, 5, 0, 7); c.fill(); c.stroke();
+    }
+  }
+}
 function paintAbilities(){
-  $("#abBal").textContent = P.coins.toLocaleString();
+  $("#abBal").textContent = coinsLabel();
   $("#abHotbar").innerHTML = (P.hotbar || []).map((id, i) => {
     const key = (P.keybinds || [])[i] || String(i + 1);
     const a = id ? abilityById(id) : null;
@@ -3119,15 +3198,16 @@ function paintAbilities(){
     const btn = owned
       ? '<button class="mini" data-equip="' + a.id + '">' + (inSlot >= 0 ? "SLOT " + (inSlot+1) : "EQUIP") + "</button>"
       : '<button class="mini" data-buyab="' + a.id + '">BUY</button>';
-    return '<div class="item' + (owned ? " own" : "") + '"><div class="sw">' + a.name.charAt(0) +
+    return '<div class="item' + (owned ? " own" : "") + '"><div class="sw" style="padding:0">' +
+      '<canvas data-prev="' + a.id + '" style="width:100%;height:100%;display:block"></canvas>' +
       '</div><div class="mt"><b>' + a.name + "</b><span>" + a.desc +
       " · " + a.cd + "s cooldown</span></div><div class=\"by\">" +
       '<span class="price">' + (owned ? "OWNED" : a.cost.toLocaleString()) + "</span>" + btn + "</div></div>";
   }).join("");
   $$("#abGrid [data-buyab]").forEach(b => b.addEventListener("click", () => {
     const a = abilityById(b.dataset.buyab);
-    if(P.coins < a.cost){ toast("Not enough coins — you need " + (a.cost - P.coins).toLocaleString() + " more."); return; }
-    P.coins -= a.cost;
+    if(!canAfford(a.cost)){ toast("Not enough coins — you need " + (a.cost - P.coins).toLocaleString() + " more."); return; }
+    spendCoins(a.cost);
     P.abilities = (P.abilities || []).concat(a.id);
     const free = (P.hotbar || []).indexOf(null);
     if(free >= 0) P.hotbar[free] = a.id;       /* drop it straight into a slot */
@@ -3177,8 +3257,8 @@ function paintShop(){
   }).join("");
   $$("#shopGrid [data-buy]").forEach(b => b.addEventListener("click", () => {
     const price = +b.dataset.price, name = b.dataset.buy;
-    if(P.coins < price){ toast("Not enough coins — you need " + (price - P.coins).toLocaleString() + " more."); return; }
-    P.coins -= price;
+    if(!canAfford(price)){ toast("Not enough coins — you need " + (price - P.coins).toLocaleString() + " more."); return; }
+    spendCoins(price);
     if(P.owned.indexOf(name) < 0) P.owned.push(name);
     save(); paintShop(); paintRoster();
     toast(name + " purchased.");
@@ -3197,6 +3277,7 @@ function paintProfile(){
     ((P.bestLoginStreak || 0) > (P.loginStreak || 0) ? " (best " + P.bestLoginStreak + ")" : "");
   $("#pfP").textContent = P.fastest ? P.fastest.toFixed(1) + " m/s" : "—";
   $("#pfRp").textContent = P.rp;
+  $("#pfInf").textContent = P.infCoins ? "ON" : "OFF";
   let cur = 0;
   TIERS.forEach((t,i) => { if(P.rp >= t[1]) cur = i; });
   $("#tierList").innerHTML = TIERS.map((t,i) =>
@@ -3271,6 +3352,8 @@ function frame(now){
   if(toastT > 0){ toastT -= dt; if(toastT <= 0) $("#toast").classList.remove("show"); }
   if(Screen.now === "setup"){ drawOverlay($("#overlay")); paintSetup(); }
   if(Screen.now === "select") drawSelectPreview(now / 1000);
+  if(Screen.now === "abilities")
+    $$("canvas[data-prev]").forEach(cv => drawMovePreview(cv, cv.dataset.prev, now / 1000));
   if(Screen.now === "fight"){ matchTick(dt); netTick(now); drawArena(now / 1000); drawOverlay($("#pipC")); }
   requestAnimationFrame(frame);
 }
